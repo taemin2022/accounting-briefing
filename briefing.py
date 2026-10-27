@@ -12,6 +12,7 @@ import re
 import sys
 import urllib.error
 import urllib.request
+import urllib.parse
 from zoneinfo import ZoneInfo
 
 ROOT = pathlib.Path(__file__).resolve().parent
@@ -51,7 +52,8 @@ def request_ai(kind, start, end):
     if not key:
         raise RuntimeError('OPENAI_API_KEY secret is missing')
     data = {'model': os.getenv('OPENAI_MODEL', 'gpt-6.1-sol'),
-            'tools': [{'type': 'web_search'}],
+            'tools': [{'type': 'web_search', **({'filters': {'allowed_domains': ['fss.or.kr']}} if kind == 'fss' else {})}],
+            'include': ['web_search_call.action.sources'],
             'tool_choice': 'auto',
             'input': instructions(kind, start, end),
             'max_output_tokens': 6500}
@@ -76,10 +78,54 @@ def request_ai(kind, start, end):
         raise RuntimeError('AI response was not valid JSON; no files published') from e
     if not isinstance(result, dict) or not isinstance(result.get('items'), list):
         raise RuntimeError('AI response has unexpected structure; no files published')
+    # AI-generated URLs alone are insufficient: compare with sources actually consulted by the web tool.
+    cited = set()
+    for entry in payload.get('output', []):
+        if entry.get('type') == 'web_search_call':
+            action = entry.get('action') or {}
+            for source in action.get('sources') or []:
+                if isinstance(source, dict) and source.get('url'):
+                    cited.add(source['url'])
+        if entry.get('type') == 'message':
+            for content in entry.get('content') or []:
+                for annotation in content.get('annotations') or []:
+                    if annotation.get('type') == 'url_citation' and annotation.get('url'):
+                        cited.add(annotation['url'])
+    if not cited:
+        raise RuntimeError('Web search returned no traceable cited source URLs; no publication')
+    result['_cited_urls'] = cited
     return result
 
 
-def clean_items(items, start, end):
+def normalize_url(url):
+    parts = urllib.parse.urlsplit(url)
+    return (parts.scheme.lower(), (parts.hostname or '').lower(), parts.path.rstrip('/'), parts.query)
+
+
+def check_url(url, kind, cited):
+    try:
+        parts = urllib.parse.urlsplit(url)
+        host = (parts.hostname or '').lower()
+        if parts.scheme != 'https' or not host or parts.username or parts.password or parts.port not in (None, 443):
+            return False
+        if kind == 'fss' and host != 'fss.or.kr' and not host.endswith('.fss.or.kr'):
+            return False
+        # Model must point to a URL actually surfaced by the web-search result.
+        if normalize_url(url) not in {normalize_url(u) for u in cited}:
+            return False
+        req = urllib.request.Request(url, headers={'User-Agent':'Mozilla/5.0 (compatible; BriefingVerifier/1.0)'})
+        with urllib.request.urlopen(req, timeout=12) as resp:
+            final = urllib.parse.urlsplit(resp.geturl())
+            final_host = (final.hostname or '').lower()
+            if kind == 'fss' and final_host != 'fss.or.kr' and not final_host.endswith('.fss.or.kr'):
+                return False
+            mime = resp.headers.get('Content-Type','').lower()
+            return 200 <= resp.status < 300 and ('text/html' in mime or 'application/pdf' in mime or 'application/octet-stream' in mime)
+    except (ValueError, OSError, urllib.error.URLError):
+        return False
+
+
+def clean_items(items, start, end, kind, cited):
     usable, seen = [], set()
     for x in items:
         if not isinstance(x, dict):
@@ -89,7 +135,7 @@ def clean_items(items, start, end):
             continue
         if any(ch in url for ch in '<>"\\') or ' ' in url:
             continue
-        if url in seen:
+        if url in seen or not check_url(url, kind, cited):
             continue
         seen.add(url)
         usable.append({k: str(x.get(k, '')).strip() for k in ('title','date','summary','implication','url')})
@@ -112,10 +158,10 @@ def page(kind, title, date, start, end, intro, items):
 
 
 def save(kind, now, start, end, result):
-    items = clean_items(result['items'], start, end)
-    # Fail closed if AI claims sources but none satisfy basic checks; URL reachability is NOT independently verified.
-    if result['items'] and not items:
-        raise RuntimeError('No dated HTTPS sources passed basic validation; publishing stopped')
+    items = clean_items(result['items'], start, end, kind, result.get('_cited_urls', set()))
+    # Never publish a 'no news' article when we cannot prove coverage was complete.
+    if not items:
+        raise RuntimeError('No reachable, cited source from the required date range; no publication. Check source availability and dates.')
     title = f'{CATEGORIES[kind]} | {start}' if kind == 'fss' else f'{CATEGORIES[kind]} | {start}~{end}'
     summary = str(result.get('summary', '')).strip()[:280]
     slug = f'{kind}-{now.date().isoformat()}'
@@ -136,7 +182,7 @@ def save(kind, now, start, end, result):
     posts.append({'category':kind,'date':now.date().isoformat(),'title':title,'summary':summary,'url':url})
     posts.sort(key=lambda p:p.get('date',''),reverse=True)
     posts_file.write_text(json.dumps(posts, ensure_ascii=False, indent=2)+'\n', encoding='utf-8')
-    print(f'Created {url}: {len(items)} sourced items. Note: URLs not independently reachability-checked.')
+    print(f'Created {url}: {len(items)} cited, HTTPS-reachable items. Publication dates/content still require editorial checking.')
 
 
 def main():
