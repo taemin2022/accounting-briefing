@@ -44,7 +44,7 @@ def instructions(kind, start, end):
             '스키마: {"title":"한국어 브리핑 제목","summary":"두 문장 이내 전체 요약",'
             '"items":[{"title":"제목","date":"YYYY-MM-DD","summary":"사실 요약 2~4문장",'
             '"implication":"실무 영향 및 검토 사항","url":"https://공식출처-원문"}]}.'
-            '품질 우선, 상세 자료가 있으면 3~10건, 미확인 자료를 억지로 채우지 않는다.')
+            '품질 우선, 상세 자료가 있으면 3~10건, 미확인 자료를 억지로 채우지 않는다. ''한국어 서술은 보고서용 존댓말(~습니다, ~합니다)로 작성하라. ''summary와 implication에는 출처 도메인, URL, 마크다운 링크를 삽입하지 마라. 링크는 url 필드에만 넣어라.')
 
 
 def request_ai(kind, start, end):
@@ -142,19 +142,28 @@ def clean_items(items, start, end, kind, cited):
     return usable
 
 
+def display_text(value):
+    """Remove duplicated inline source links; the separate 원문 확인 button retains the URL."""
+    value = str(value or '')
+    value = re.sub(r'\s*\([^()\n]{1,100}\)\(https?://[^\s)]+\)', '', value)
+    value = re.sub(r'\s*\(https?://[^\s)]+\)', '', value)
+    value = re.sub(r'\s*https?://[^\s<>()]+', '', value)
+    return re.sub(r'[ \t]{2,}', ' ', value).strip()
+
+
 def page(kind, title, date, start, end, intro, items):
     rows = []
     for idx, x in enumerate(items, 1):
         rows.append(f'<article><div class="kicker">{idx:02} · {html.escape(x["date"])}</div>'
                     f'<h2>{html.escape(x["title"])}</h2>'
-                    f'<p>{html.escape(x["summary"])}</p>'
-                    f'<p><strong>실무 영향</strong> {html.escape(x["implication"])}</p>'
+                    f'<p>{html.escape(display_text(x["summary"]))}</p>'
+                    f'<div class="impact"><div class="impact-title">실무 영향 및 검토사항</div><p>{html.escape(display_text(x["implication"]))}</p></div>'
                     f'<a href="{html.escape(x["url"], quote=True)}" rel="noopener noreferrer" target="_blank">원문 확인 ↗</a></article>')
     body = '\n'.join(rows) if rows else '<article><h2>해당 기간에 확인된 신규 주요 자료가 없습니다.</h2><p>검색·수집 범위 내 결과이며 기관의 전체 발표 부재를 의미하지는 않습니다.</p></article>'
     return f'''<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{html.escape(title)}</title><style>:root{{--green:#0099A8;--orange:#FDB914;--gray:#808080}}body{{font-family:system-ui,'Noto Sans KR',sans-serif;background:#f6f9f9;color:#20363c;margin:0;line-height:1.75}}main{{max-width:850px;margin:auto;padding:30px 20px 70px}}a{{color:#007985}}header{{border-top:5px solid var(--green);background:white;padding:20px}}header>div{{max-width:850px;margin:auto}}.kicker{{color:var(--green);font-size:12px;font-weight:800;letter-spacing:1px}}h1{{font-size:clamp(26px,4vw,38px);line-height:1.28}}article{{background:#fff;border:1px solid #e1ecee;border-radius:14px;padding:25px;margin:16px 0}}article h2{{font-size:20px;margin:8px 0}}.meta{{color:var(--gray)}}.notice{{border-left:4px solid var(--orange);background:white;padding:12px 18px;color:#566}}.back{{text-decoration:none;font-weight:700}}@media(max-width:600px){{article{{padding:18px}}}}</style></head><body>
+<title>{html.escape(title)}</title><style>:root{{--green:#0099A8;--orange:#FDB914;--gray:#808080}}body{{font-family:system-ui,'Noto Sans KR',sans-serif;background:#f6f9f9;color:#20363c;margin:0;line-height:1.75}}main{{max-width:850px;margin:auto;padding:30px 20px 70px}}a{{color:#007985}}header{{border-top:5px solid var(--green);background:white;padding:20px}}header>div{{max-width:850px;margin:auto}}.kicker{{color:var(--green);font-size:12px;font-weight:800;letter-spacing:1px}}h1{{font-size:clamp(26px,4vw,38px);line-height:1.28}}article{{background:#fff;border:1px solid #e1ecee;border-radius:14px;padding:25px;margin:16px 0}}article h2{{font-size:20px;margin:8px 0}}.impact{{background:#F2F4F5;border:1px solid #E4E8E9;border-radius:10px;padding:16px 18px;margin:18px 0}}.impact-title{{font-size:13px;font-weight:800;color:#007985;margin-bottom:7px}}.impact p{{margin:0}}.meta{{color:var(--gray)}}.notice{{border-left:4px solid var(--orange);background:white;padding:12px 18px;color:#566}}.back{{text-decoration:none;font-weight:700}}@media(max-width:600px){{article{{padding:18px}}}}</style></head><body>
 <header><div><a class="back" href="../index.html">← 회계 및 내부회계 AI브리핑</a></div></header><main><div class="kicker">{html.escape(CATEGORIES[kind])}</div>
-<h1>{html.escape(title)}</h1><p class="meta">대상기간 {start} ~ {end} · 작성일 {date}</p><p>{html.escape(intro)}</p><div class="notice">AI가 공개자료를 바탕으로 작성한 요약입니다. 중요한 회계·법률 판단은 원문 및 전문가 검토가 필요합니다.</div>{body}</main></body></html>'''
+<h1>{html.escape(title)}</h1><p class="meta">대상기간 {start} ~ {end} · 작성일 {date}</p><p>{html.escape(display_text(intro))}</p><div class="notice">AI가 공개자료를 바탕으로 작성한 요약입니다. 중요한 회계·법률 판단은 원문 및 전문가 검토가 필요합니다.</div>{body}</main></body></html>'''
 
 
 def save(kind, now, start, end, result):
