@@ -1,7 +1,10 @@
 name: AI 브리핑 생성 및 사이트 게시
 
-# First stage: manual runs only. After validation, schedule can be enabled.
+# Weekly reports: every Monday 09:00 KST (Monday 00:00 UTC).
+# FSS daily scheduling stays OFF until FSS API integration is ready.
 on:
+  schedule:
+    - cron: '0 0 * * 1'
   workflow_dispatch:
     inputs:
       kind:
@@ -41,7 +44,8 @@ jobs:
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           OPENAI_MODEL: gpt-6.1-sol
-        run: python briefing.py --kind "${{ inputs.kind }}"
+          RUN_KIND: ${{ github.event_name == 'schedule' && 'weekly' || inputs.kind }}
+        run: python briefing.py --kind "$RUN_KIND"
       - name: Save new files to repository
         run: |
           git config user.name "github-actions[bot]"
