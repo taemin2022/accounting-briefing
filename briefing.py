@@ -23,14 +23,14 @@ CATEGORIES = {'fss': '금융감독원 일일 브리핑', 'ifrs': 'K-IFRS·내부
 
 def time_range(kind, now):
     if kind == 'fss':
-        day = now.date()
-        return day.isoformat(), day.isoformat()
+        # Catch up on missed days/weekends, then deduplicate against previously published URLs.
+        return (now.date() - dt.timedelta(days=7)).isoformat(), now.date().isoformat()
     monday = now.date() - dt.timedelta(days=now.weekday() + 7)
     return monday.isoformat(), (monday + dt.timedelta(days=6)).isoformat()
 
 
 def instructions(kind, start, end):
-    prefix = f'한국시간 기준 대상기간: {start} ~ {end}. 이 기간 중 실제 발표일을 확인한 신규 공개 자료만 포함하라. 오늘 발표 내용은 아직 없을 수도 있다.\n'
+    prefix = f'한국시간 기준 검색대상기간: {start} ~ {end}. 실제 발표일을 확인한 자료만 포함하라. 금융감독원 일일 브리핑은 전일 미수집 자료도 확보하도록 최근 7일을 검색하며 기존 게시자료는 프로그램에서 중복 제외한다.\\n'
     if kind == 'fss':
         domain = '금융감독원 공식 보도자료를 우선 확인. 모든 보도자료 중 회계·감사·공시·감리·내부회계 관련 자료를 우선 배치하고, 그 외 중요한 금융감독원 발표도 누락하지 않도록 한다.'
     elif kind == 'ifrs':
@@ -159,10 +159,25 @@ def page(kind, title, date, start, end, intro, items):
 
 def save(kind, now, start, end, result):
     items = clean_items(result['items'], start, end, kind, result.get('_cited_urls', set()))
+    print(f'Validation: AI returned {len(result["items"])} candidate(s), {len(result.get("_cited_urls", []))} cited URL(s), {len(items)} passed.', flush=True)
     # Never publish a 'no news' article when we cannot prove coverage was complete.
     if not items:
-        raise RuntimeError('No reachable, cited source from the required date range; no publication. Check source availability and dates.')
-    title = f'{CATEGORIES[kind]} | {start}' if kind == 'fss' else f'{CATEGORIES[kind]} | {start}~{end}'
+        raise RuntimeError('SOURCE_UNAVAILABLE: no verified sources in the search window. This is not proof that no press releases were published; no publication.')
+    # Do not re-publish previously published original source URLs.
+    prior_urls = set()
+    for old_page in (ROOT / 'briefings').glob(f'{kind}-*.html'):
+        try:
+            old_html = old_page.read_text(encoding='utf-8')
+            prior_urls.update(html.unescape(u) for u in re.findall(r'href="(https://[^"]+)"', old_html))
+        except OSError:
+            pass
+    before = len(items)
+    items = [item for item in items if item['url'] not in prior_urls]
+    print(f'Deduplication: removed {before-len(items)} already-published source(s).', flush=True)
+    if not items:
+        print('NO_NEW_ITEMS: verified sources were already published; leaving website unchanged.', flush=True)
+        return
+    title = f'{CATEGORIES[kind]} | {now.date().isoformat()}' if kind == 'fss' else f'{CATEGORIES[kind]} | {start}~{end}'
     summary = str(result.get('summary', '')).strip()[:280]
     slug = f'{kind}-{now.date().isoformat()}'
     url = f'briefings/{slug}.html'
