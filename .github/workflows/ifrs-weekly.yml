@@ -1,0 +1,39 @@
+name: K-IFRS·내부회계 주간 자동 브리핑
+
+on:
+  schedule:
+    - cron: '0 0 * * 1' # Monday 09:00 KST (UTC 00:00)
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# Serializes writes with other briefing workflows, without coupling their results.
+concurrency:
+  group: accounting-briefing-generation
+  cancel-in-progress: false
+
+jobs:
+  generate-ifrs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Generate IFRS and internal control briefing
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: gpt-6.1-sol
+        run: python briefing.py --kind ifrs
+      - name: Save report to repository
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add posts.json briefings/
+          if ! git diff --cached --quiet; then
+            git commit -m "Publish K-IFRS weekly briefing"
+            git push
+          fi

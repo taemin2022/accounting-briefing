@@ -1,10 +1,8 @@
-name: AI 브리핑 생성 및 사이트 게시
+name: AI 브리핑 수동 생성
 
-# Weekly reports: every Monday 09:00 KST (Monday 00:00 UTC).
-# FSS daily scheduling stays OFF until FSS API integration is ready.
+# FSS remains manual until its official API is connected.
+# Weekly briefing jobs have independent schedules in separate workflows.
 on:
-  schedule:
-    - cron: '0 0 * * 1'
   workflow_dispatch:
     inputs:
       kind:
@@ -20,19 +18,14 @@ on:
 
 permissions:
   contents: write
-  pages: write
-  id-token: write
 
 concurrency:
-  group: accounting-briefing-deployment
+  group: accounting-briefing-generation
   cancel-in-progress: false
 
 jobs:
   generate:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -40,27 +33,19 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Generate briefing (OpenAI API)
+      - name: Generate requested briefing
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           OPENAI_MODEL: gpt-6.1-sol
-          RUN_KIND: ${{ github.event_name == 'schedule' && 'weekly' || inputs.kind }}
+          RUN_KIND: ${{ inputs.kind }}
         run: python briefing.py --kind "$RUN_KIND"
-      - name: Save new files to repository
+      - name: Save reports to repository
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add posts.json briefings/
           if ! git diff --cached --quiet; then
-            git commit -m "Publish AI briefing"
+            git commit -m "Publish ${{ inputs.kind }} briefing"
             git push
           fi
-      - name: Configure GitHub Pages
-        uses: actions/configure-pages@v5
-      - name: Upload website files
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: '.'
-      - name: Deploy website
-        id: deployment
-        uses: actions/deploy-pages@v4
+# Existing deploy-site.yml deploys whenever posts.json or briefings/ changes.

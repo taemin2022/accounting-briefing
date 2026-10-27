@@ -1,0 +1,39 @@
+name: 보안시장 주간 자동 브리핑
+
+on:
+  schedule:
+    - cron: '0 0 * * 1' # Monday 09:00 KST (UTC 00:00)
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# Serializes writes with other briefing workflows, without coupling their results.
+concurrency:
+  group: accounting-briefing-generation
+  cancel-in-progress: false
+
+jobs:
+  generate-security:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Generate physical security market briefing
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: gpt-6.1-sol
+        run: python briefing.py --kind security
+      - name: Save report to repository
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add posts.json briefings/
+          if ! git diff --cached --quiet; then
+            git commit -m "Publish security market weekly briefing"
+            git push
+          fi
