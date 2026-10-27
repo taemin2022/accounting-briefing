@@ -44,7 +44,7 @@ def instructions(kind, start, end):
             '스키마: {"title":"한국어 브리핑 제목","summary":"두 문장 이내 전체 요약",'
             '"items":[{"title":"제목","date":"YYYY-MM-DD","summary":"사실 요약 2~4문장",'
             '"implication":"실무 영향 및 검토 사항","url":"https://공식출처-원문"}]}.'
-            '품질 우선, 상세 자료가 있으면 3~10건, 미확인 자료를 억지로 채우지 않는다. ''한국어 서술은 보고서용 존댓말(~습니다, ~합니다)로 작성하라. ''summary와 implication에는 출처 도메인, URL, 마크다운 링크를 삽입하지 마라. 링크는 url 필드에만 넣어라.')
+            '품질 우선, 상세 자료가 있으면 3~10건, 미확인 자료를 억지로 채우지 않는다. ''반드시 모든 문장을 정중한 보고서 문체(~습니다, ~합니다, ~입니다)로 종결하라. 해라체(~다, ~한다, ~했다, ~필요가 있다)로 끝내지 마라. ''summary와 implication에는 출처 도메인, URL, 마크다운 링크를 삽입하지 마라. 링크는 url 필드에만 넣어라.')
 
 
 def request_ai(kind, start, end):
@@ -142,13 +142,50 @@ def clean_items(items, start, end, kind, cited):
     return usable
 
 
+
+# Restrict changes to sentence endings. Never change document titles, URLs or HTML attributes.
+SENTENCE_ENDINGS = [
+    ("해야 한다", "해야 합니다"),
+    ("할 필요가 있다", "할 필요가 있습니다"),
+    ("할 수 있다", "할 수 있습니다"),
+    ("할 수 없다", "할 수 없습니다"),
+    ("것으로 보인다", "것으로 보입니다"),
+    ("필요가 있다", "필요가 있습니다"),
+    ("필요가 없다", "필요가 없습니다"),
+    ("않는다", "않습니다"),
+    ("있다", "있습니다"),
+    ("없다", "없습니다"),
+    ("된다", "됩니다"),
+    ("한다", "합니다"),
+    ("이다", "입니다"),
+    ("였다", "였습니다"),
+    ("됐다", "됐습니다"),
+    ("했다", "했습니다"),
+    ("혔다", "혔습니다"),
+    ("았다", "았습니다"),
+    ("었다", "었습니다"),
+    ("냈다", "냈습니다"),
+    ("졌다", "졌습니다"),
+    ("쳤다", "쳤습니다"),
+    ("났다", "났습니다"),
+    ("봤다", "봤습니다"),
+    ("갔다", "갔습니다"),
+]
+def formalize(text):
+    """Conservative, non-AI plain-style to polite style conversion."""
+    value=str(text or "")
+    # Only convert explicit declarative sentence endings.
+    for old, new in SENTENCE_ENDINGS:
+        value = re.sub(re.escape(old)+r'(?=\s*(?:[.!?]|$))', new, value)
+    return value
+
 def display_text(value):
     """Remove duplicated inline source links; the separate 원문 확인 button retains the URL."""
     value = str(value or '')
     value = re.sub(r'\s*\([^()\n]{1,100}\)\(https?://[^\s)]+\)', '', value)
     value = re.sub(r'\s*\(https?://[^\s)]+\)', '', value)
     value = re.sub(r'\s*https?://[^\s<>()]+', '', value)
-    return re.sub(r'[ \t]{2,}', ' ', value).strip()
+    return formalize(re.sub(r'[ \t]{2,}', ' ', value).strip())
 
 
 def page(kind, title, date, start, end, intro, items):
@@ -187,7 +224,7 @@ def save(kind, now, start, end, result):
         print('NO_NEW_ITEMS: verified sources were already published; leaving website unchanged.', flush=True)
         return
     title = f'{CATEGORIES[kind]} | {now.date().isoformat()}' if kind == 'fss' else f'{CATEGORIES[kind]} | {start}~{end}'
-    summary = str(result.get('summary', '')).strip()[:280]
+    summary = formalize(str(result.get('summary', '')).strip())[:280]
     slug = f'{kind}-{now.date().isoformat()}'
     url = f'briefings/{slug}.html'
     posts_file = ROOT/'posts.json'
