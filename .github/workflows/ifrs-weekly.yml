@@ -1,8 +1,8 @@
-name: K-IFRS·내부회계 주간 자동 브리핑
+name: K-IFRS·내부회계 일일 자동 브리핑
 
 on:
   schedule:
-    - cron: '0 0 * * 1' # Monday 09:00 KST (UTC 00:00)
+    - cron: '0 0 * * *' # Every day 09:00 KST (UTC 00:00)
   workflow_dispatch:
 
 permissions:
@@ -34,6 +34,6 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add posts.json briefings/
           if ! git diff --cached --quiet; then
-            git commit -m "Publish K-IFRS weekly briefing"
+            git commit -m "Publish K-IFRS daily briefing"
             git push
           fi
