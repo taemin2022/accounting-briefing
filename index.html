@@ -36,6 +36,10 @@
     .service-top{display:flex;align-items:center;justify-content:space-between;gap:7px;flex-wrap:wrap}
     .service-num{font-size:10px;letter-spacing:.07em;color:var(--green);font-weight:800}
     .frequency{border:1px solid #D3E9EB;background:var(--pale);color:var(--green-deep);padding:4px 7px;border-radius:99px;font-size:10px;font-weight:700}
+    /* 보안시장 일정 배지가 길어도 상단 오른쪽에 한 줄로 유지 */
+    .service[data-select-kind="security"] .service-top{flex-wrap:nowrap;gap:3px}
+    .service[data-select-kind="security"] .service-num{font-size:9px;letter-spacing:0;white-space:nowrap;flex-shrink:1}
+    .service[data-select-kind="security"] .frequency{font-size:9px;letter-spacing:-.05em;padding:4px 5px;white-space:nowrap;flex-shrink:0}
     .service h2{font-size:16px;letter-spacing:-.04em;margin:12px 0 6px;word-break:keep-all}
     .service p{font-size:11px;color:var(--muted);line-height:1.6;margin:0;word-break:keep-all}
     .service-rule{height:3px;width:30px;background:var(--orange);border-radius:3px;margin-top:13px}
