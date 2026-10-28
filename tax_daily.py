@@ -30,9 +30,21 @@ FEEDS = {
     '관세청 행정규칙 예고': 'https://www.customs.go.kr/kcs/selectBoardRss.do?mi=2897&bbsId=1366',
 }
 ALLOW_DOMAINS = ('mofe.go.kr', 'customs.go.kr', 'nts.go.kr', 'taxlaw.nts.go.kr')
-TAX_TERMS = ('세법','세금','세액','법인세','부가가치세','부가세','원천징수','원천세','조세','세제',
-             '세무','과세','비과세','면세','환급','공제','신고','소득세','상속세','증여세','관세',
-             '통관','FTA','국제조세','이전가격','납세','국세','수입신고','수출신고','사전심사', '조세심판')
+# Broad terms such as 신고, 공제, 관세 can occur in unrelated promotions.
+CORE_TERMS = ('법인세','부가가치세','부가세','원천징수','원천세','조세특례','조특법','세법','세제개편',
+              '세무조정','세액공제','손금','익금','과세표준','이전가격','국제조세','세금계산서',
+              '매입세액','유권해석','법령해석','조세심판','관세율','관세평가','관세 환급',
+              'FTA 원산지','세무조사','납세의무','과세처분','국세기본법','관세법','관세 개정')
+EXCLUDE_TERMS = ('할인 행사','할인행사','페스티벌','축제','이벤트','캠페인','채용','공모전',
+                 '교육생 모집','서포터즈','경품','관광','문화행사','콘서트','소비 진작','소비촉진',
+                 '자동차 가격 할인','할인 정보','업무협약','인사 발령')
+
+def relevant_title(record):
+    title=clean(record.get('title','')).lower()
+    if not any(x.lower() in title for x in CORE_TERMS):return False
+    if any(x.lower() in title for x in EXCLUDE_TERMS):return False
+    return True
+
 MAX_NEW = 24
 
 def clean(s):
@@ -190,18 +202,23 @@ def analyze(records):
 법령 개정의 확정 여부, 유권해석의 결론·시행일 등 원문에 없다면 확정적으로 쓰지 마세요.
 기업 법인세/부가가치세/관세 실무 관련성을 중심으로 한국어 존댓말 2~4문장의 요약과 2~3문장의 검토사항을 작성하세요.
 원문에 충분한 사실이 없다면 확인이 필요한 사항으로 명시하세요. 전문 보고서처럼 간결하고 유용하게 작성하세요.
-JSON만 반환: {"summary":"당일 전체 동향 요약", "items":[{"id":"...", "summary":"...", "implication":"..."}]}\n자료:\n'''+json.dumps(records,ensure_ascii=False)
+각 후보에 대해 기업 세무 직접 관련성이 없으면 include=false로 표시하고 summary, implication은 빈 문자열로 하세요.
+특히 할인·행사·홍보·일반 경제뉴스는 반드시 제외하세요.
+JSON만 반환: {"summary":"실제 선택한 자료만을 종합한 요약", "items":[{"id":"...", "include":true, "summary":"...", "implication":"..."}]}\n자료:\n'''+json.dumps(records,ensure_ascii=False)
     result=ask_ai(prompt)
     mapped={r['id']:r for r in result.get('items',[]) if isinstance(r,dict) and isinstance(r.get('id'),str)}
     if set(mapped)!={r['id'] for r in records}:raise RuntimeError('AI output IDs did not match candidates; report not published')
     items=[]
     for r in records:
         x=mapped[r['id']]
+        if x.get('include') is not True:
+            continue
         if not clean(x.get('summary','')) or not clean(x.get('implication','')):
             raise RuntimeError('AI left empty analysis text')
         items.append(dict(title=r['title'],date=r['date'],url=r['url'],summary=clean(x['summary']),implication=clean(x['implication'])))
     overall=clean(result.get('summary',''))
-    if not overall:raise RuntimeError('AI returned empty overall summary')
+    if items and not overall:raise RuntimeError('AI returned empty overall summary')
+    print(f'TAX_RELEVANCE: {len(items)}/{len(records)} candidates retained',flush=True)
     return overall,items
 
 def publish(today,start,end,summary,items,ids):
@@ -257,7 +274,7 @@ def main():
             n,rows=rss_rows(label,url)
             successful+=1
             selected=[x for x in rows if start.isoformat()<=x['date']<=end.isoformat()
-                      and any(term in (x['title']+' '+x['excerpt']) for term in TAX_TERMS)]
+                      and relevant_title(x)]
             collected+=selected
             print(f'RSS {label}: {n} entries, {len(selected)} tax-related in date window',flush=True)
         except Exception as exc:
@@ -271,13 +288,18 @@ def main():
     unique={x['id']:x for x in collected}
     seen=get_existing()
     new=[x for k,x in unique.items() if k not in seen]
-    print(f'TAX_COLLECT: {len(unique)} distinct official candidates, {len(new)} new',flush=True)
+    before=len(new)
+    new=[r for r in new if relevant_title(r)]
+    print(f'TAX_COLLECT: {len(unique)} distinct candidates, {before} new, {len(new)} relevant titles',flush=True)
     if not new:
         print('NO_NEW_ITEMS: no verified new tax source; no new report',flush=True);return
     if len(new)>MAX_NEW:
         raise RuntimeError(f'{len(new)} new materials exceed limit {MAX_NEW}; review before publishing')
     summary,items=analyze(new)
-    publish(today,start,end,summary,items,[x['id'] for x in new])
+    if not items:
+        print('NO_RELEVANT_ITEMS: no business-tax material approved for publication',flush=True)
+        return
+    publish(today,start,end,summary,items,[x['id'] for x in new if x['title'] in {i['title'] for i in items}])
 
 if __name__=='__main__':
     try:main()
