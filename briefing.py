@@ -18,13 +18,15 @@ from zoneinfo import ZoneInfo
 ROOT = pathlib.Path(__file__).resolve().parent
 TZ = ZoneInfo('Asia/Seoul')
 API = 'https://api.openai.com/v1/responses'
-CATEGORIES = {'fss': '금융감독원 일일 브리핑', 'ifrs': 'K-IFRS·내부회계 주간 브리핑', 'security': '보안시장 주간 동향'}
+CATEGORIES = {'fss': '금융감독원 일일 브리핑', 'ifrs': 'K-IFRS·내부회계 일일 브리핑', 'security': '보안시장 주간 동향'}
 
 
 def time_range(kind, now):
-    if kind == 'fss':
-        # Catch up on missed days/weekends, then deduplicate against previously published URLs.
-        return (now.date() - dt.timedelta(days=7)).isoformat(), now.date().isoformat()
+    if kind in ('fss', 'ifrs'):
+        # Daily report: include the last seven completed calendar days for weekend/failure catch-up.
+        # Previously published original URLs are deduplicated in save().
+        yesterday = now.date() - dt.timedelta(days=1)
+        return (yesterday - dt.timedelta(days=6)).isoformat(), yesterday.isoformat()
     monday = now.date() - dt.timedelta(days=now.weekday() + 7)
     return monday.isoformat(), (monday + dt.timedelta(days=6)).isoformat()
 
@@ -34,7 +36,7 @@ def instructions(kind, start, end):
     if kind == 'fss':
         domain = '금융감독원 공식 보도자료를 우선 확인. 모든 보도자료 중 회계·감사·공시·감리·내부회계 관련 자료를 우선 배치하고, 그 외 중요한 금융감독원 발표도 누락하지 않도록 한다.'
     elif kind == 'ifrs':
-        domain = 'K-IFRS/IFRS와 내부회계관리제도 관련 공식 개정, 금융감독원·한국회계기준원·IFRS Foundation 발표, 감사·감리 동향을 확인한다. 특히 K-IFRS 1115,1002,1116,1019, IFRS 18, 연결내부회계, ITGC 실무 영향을 분석한다.'
+        domain = 'K-IFRS/IFRS와 내부회계관리제도 관련 새 발표와 공식 개정, 금융감독원·한국회계기준원·IFRS Foundation 발표, 감사·감리 동향을 확인한다. 특히 K-IFRS 1118(=IFRS 18), 1115, 1002, 1116, 연결내부회계, ITGC 실무 영향을 분석한다. 발표일·효력발생일·적용 대상과 회계·통제 활동 영향을 구분하여 구체적으로 설명한다.'
     else:
         domain = '국내외 CCTV/IP카메라, VMS/NVR, AI 영상분석, VSaaS, 출입통제, 이미지센서, 입찰/RFP, 규제 및 경쟁사(Axis, Hanwha Vision, Hikvision, Dahua, i-PRO, Genetec, Milestone) 동향을 확인하고 제조사 관점의 시사점을 분석한다.'
     return (prefix + domain + '\n웹 검색을 사용해 실제 원문 링크를 찾아라. 출처가 없는 문서는 절대 생성하지 마라. 불확실한 내용은 제외하라. '
@@ -223,7 +225,7 @@ def save(kind, now, start, end, result):
     if not items:
         print('NO_NEW_ITEMS: verified sources were already published; leaving website unchanged.', flush=True)
         return
-    title = f'{CATEGORIES[kind]} | {now.date().isoformat()}' if kind == 'fss' else f'{CATEGORIES[kind]} | {start}~{end}'
+    title = f'{CATEGORIES[kind]} | {now.date().isoformat()}' if kind in ('fss','ifrs') else f'{CATEGORIES[kind]} | {start}~{end}'
     summary = formalize(str(result.get('summary', '')).strip())[:280]
     slug = f'{kind}-{now.date().isoformat()}'
     url = f'briefings/{slug}.html'
