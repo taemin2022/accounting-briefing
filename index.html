@@ -37,6 +37,9 @@
     .service-num{font-size:10px;letter-spacing:.07em;color:var(--green);font-weight:800}
     .frequency{border:1px solid #D3E9EB;background:var(--pale);color:var(--green-deep);padding:4px 7px;border-radius:99px;font-size:10px;font-weight:700}
     /* 보안시장 일정 배지가 길어도 상단 오른쪽에 한 줄로 유지 */
+    .service[data-select-kind="tax"] .service-top{flex-wrap:nowrap;gap:3px}
+    .service[data-select-kind="tax"] .service-num{font-size:9px;letter-spacing:0;white-space:nowrap}
+    .service[data-select-kind="tax"] .frequency{font-size:9px;padding:4px 5px;white-space:nowrap}
     .service[data-select-kind="security"] .service-top{flex-wrap:nowrap;gap:3px}
     .service[data-select-kind="security"] .service-num{font-size:9px;letter-spacing:0;white-space:nowrap;flex-shrink:1}
     .service[data-select-kind="security"] .frequency{font-size:9px;letter-spacing:-.05em;padding:4px 5px;white-space:nowrap;flex-shrink:0}
@@ -102,7 +105,7 @@
       <div class="hero">
         <div class="kicker">ACCOUNTING INTELLIGENCE</div>
         <h1>회계 및 내부회계 <span class="accent">AI브리핑</span></h1>
-        <p class="hero-description">금융감독원 주요 발표와 K-IFRS·내부회계, 보안시장 동향을 실무 관점에서 정리해 전합니다.</p>
+        <p class="hero-description">금융감독원 주요 발표와 K-IFRS·내부회계, 세무·보안시장 동향을 실무 관점에서 정리해 전합니다.</p>
       </div>
       <section class="services" aria-label="브리핑 종류 선택">
         <button type="button" class="service" data-select-kind="fss" aria-pressed="false">
@@ -121,6 +124,12 @@
           <div class="service-top"><span class="service-num">03 / SECURITY MARKET</span><span class="frequency">매주 월요일 09:00 업데이트</span></div>
           <h2>보안시장 주간 동향</h2>
           <p>CCTV·IP카메라, VMS·NVR, AI 영상분석 및 경쟁사 동향을 정리합니다.</p>
+          <div class="service-rule"></div>
+        </button>
+        <button type="button" class="service" data-select-kind="tax" aria-pressed="false">
+          <div class="service-top"><span class="service-num">04 / TAX INTELLIGENCE</span><span class="frequency">매일 09:15 업데이트</span></div>
+          <h2>세무 일일 브리핑</h2>
+          <p>세법 변경, 국세청 법령해석, 주요 조세심판례를 기업 세무 실무 관점에서 정리합니다.</p>
           <div class="service-rule"></div>
         </button>
       </section>
@@ -145,6 +154,7 @@
           <button type="button" data-kind="fss" aria-pressed="false">금융감독원 일일</button>
           <button type="button" data-kind="ifrs" aria-pressed="false">K-IFRS 일일</button>
           <button type="button" data-kind="security" aria-pressed="false">보안시장 주간</button>
+          <button type="button" data-kind="tax" aria-pressed="false">세무 일일</button>
         </div>
         <input id="search" class="search" type="search" aria-label="브리핑 검색" placeholder="제목 · 내용 검색">
       </div>
@@ -152,7 +162,7 @@
       <div class="notice">본 사이트는 공개자료를 바탕으로 AI가 정리한 브리핑을 제공합니다. 중요한 회계·법률 판단은 공식 발표자료와 기준서 원문을 확인하시기 바랍니다.</div>
     </section>
   </main>
-  <footer class="container"><span>© Accounting &amp; Internal Control AI Briefing</span><span>금융감독원 · K-IFRS · 보안시장 동향</span></footer>
+  <footer class="container"><span>© Accounting &amp; Internal Control AI Briefing</span><span>금융감독원 · K-IFRS · 세무 · 보안시장 동향</span></footer>
 <script>
 'use strict';
 let posts=[],kind='all';
@@ -169,7 +179,7 @@ function draw(){
   list.innerHTML=shown.map(p=>{
     const url=String(p.url??'');
     const safeUrl=/^(?!\/\/)(?!.*(?:^|\/)\.\.\/)([a-zA-Z0-9_./%-]+)$/.test(url)?url:'';
-    const content=`<div class="post-content"><div class="post-title-row"><h3 class="post-title">${esc(p.title)}</h3><span class="post-headline" title="${esc(p.headline||'')}">${esc(p.headline||'')}</span></div><small>${esc(p.date)} · ${p.category==='fss'?'금융감독원 일일':p.category==='ifrs'?'K-IFRS 일일':p.category==='security'?'보안시장 주간':'기타'} · ${esc(p.summary||'')}</small></div>`;
+    const content=`<div class="post-content"><div class="post-title-row"><h3 class="post-title">${esc(p.title)}</h3><span class="post-headline" title="${esc(p.headline||'')}">${esc(p.headline||'')}</span></div><small>${esc(p.date)} · ${p.category==='fss'?'금융감독원 일일':p.category==='ifrs'?'K-IFRS 일일':p.category==='security'?'보안시장 주간':p.category==='tax'?'세무 일일':'기타'} · ${esc(p.summary||'')}</small></div>`;
     return safeUrl
       ? `<article class="post"><a class="post-link" href="${esc(safeUrl)}" aria-label="${esc(p.title)} 브리핑 읽기">${content}<span class="post-cta" aria-hidden="true">브리핑 읽기 →</span></a></article>`
       : `<article class="post"><div class="post-link">${content}</div></article>`;
