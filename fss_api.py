@@ -205,8 +205,32 @@ def publish(now,start,end,summary,items):
 
 def main():
     today=dt.datetime.now(ZoneInfo('Asia/Seoul')).date()
+    # At the 09:30 KST scheduled run, yesterday is the last *complete* day.
+    # Use the latest published FSS report date as the next uncollected date.
+    # Example: report dated Oct 28 contains records through Oct 27;
+    # the Oct 29 run checks Oct 28 only (not the previous seven days).
     end=today-dt.timedelta(days=1)
-    start=end-dt.timedelta(days=6) # lookback prevents missed records; existing reports are deduplicated
+    previous=[]
+    for path in (ROOT / 'briefings').glob('fss-????-??-??.html'):
+        try:
+            report_day=dt.date.fromisoformat(path.stem[4:])
+        except ValueError:
+            continue
+        if report_day <= today:
+            previous.append(report_day)
+    if previous:
+        last_report=max(previous)
+        start=last_report
+        # If the daily job was interrupted for a few days, catch up once.
+        # Older URLs already present in prior reports are filtered below.
+    else:
+        # First installation: do not automatically republish a full week.
+        # Start with yesterday, and manually backfill if historical data is needed.
+        start=end
+    if start > end:
+        print('NO_NEW_WINDOW: the latest published FSS report already covers all completed days. Nothing to publish.',flush=True)
+        return
+    print(f'FSS daily collection window: {start.isoformat()} through {end.isoformat()}.',flush=True)
     found=fetch_fss(start.isoformat(),end.isoformat())
     already=prior_urls()
     new=[r for r in found if r['url'] not in already]
