@@ -29,6 +29,7 @@ jobs:
           OPENAI_MODEL: gpt-6.1-sol
         run: python briefing.py --kind ifrs
       - name: Save report to repository
+        id: save
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -36,4 +37,10 @@ jobs:
           if ! git diff --cached --quiet; then
             git commit -m "Publish K-IFRS daily briefing"
             git push
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+      - name: Trigger website deployment
+        if: steps.save.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run deploy-site.yml --ref main
           fi
