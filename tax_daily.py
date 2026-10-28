@@ -40,13 +40,20 @@ def normalized_date(value):
         return ''
 
 
-def fetch_xml(target, extra):
+def fetch_xml(target, extra, minimal=False):
     oc = os.environ.get('LAW_API_OC', '').strip()
     if not oc:
         raise RuntimeError('LAW_API_OC secret is missing')
-    params = dict(OC=oc, target=target, type='XML', display=100, page=1, **extra)
-    print(f'Law API request: target={target}, parameter_names={sorted(params.keys())}, page=1 (OC hidden)', flush=True)
-    req = urllib.request.Request(SEARCH + '?' + urllib.parse.urlencode(params), headers={
+    # Minimal probe exactly mirrors the official lawSearch.do sample parameters.
+    # Extra search options are omitted to isolate request-validation failures.
+    params = dict(OC=oc, target=target, type='XML')
+    if not minimal:
+        params.update(display=100, page=1)
+    params.update(extra)
+    param_names = sorted(params.keys())
+    print(f'Law API request: target={target}, mode={"minimal" if minimal else "standard"}, parameter_names={param_names} (OC hidden)', flush=True)
+    # Never print full request URLs: they contain the OC credential.
+    req = urllib.request.Request(SEARCH + '?' + urllib.parse.urlencode(params, encoding='utf-8'), headers={
         'User-Agent': 'AccountingBriefing/1.0', 'Accept': 'application/xml, text/xml'})
     try:
         with urllib.request.urlopen(req, timeout=40) as resp:
@@ -267,6 +274,16 @@ def main():
         # the application (현행법령 목록 XML). Separate a shared authentication/
         # gateway problem from target-specific API failures.
         baseline = ('law', {'query': '법인세법'}, {'법령명한글'})
+        # Two official-minimal probes distinguish a shared gateway denial from
+        # invalid optional search filters. Both are read-only and never publish.
+        print('DIAG_CONFIG: endpoint_host=www.law.go.kr, endpoint_path=/DRF/lawSearch.do, '
+              'oc_present=True, request_format=XML, api_secret_not_logged=True', flush=True)
+        for label, extra in [('bare', {}), ('with_query', {'query':'법인세법'})]:
+            try:
+                probe_root=fetch_xml('law', extra, minimal=True)
+                print(f'MINIMAL_CHECK_OK mode={label}, root={_tag(probe_root)!r}', flush=True)
+            except Exception as exc:
+                print(f'MINIMAL_CHECK_FAILED mode={label}: {exc}', flush=True)
         ymd=end.strftime('%Y%m%d')
         probes=[('lsHstInf', {'regDt':ymd}, {'법령명한글'}),
                 ('ntsCgmExpc', {'explYd':ymd+'~'+ymd}, {'안건명'}),
@@ -281,7 +298,7 @@ def main():
             print(f'BASIC_CHECK_OK target=law: {len(rows)} matching rows, response_root={_tag(root)!r}',flush=True)
         except Exception as exc:
             print(f'BASIC_CHECK_FAILED target=law: {exc}',flush=True)
-            print('DIAGNOSIS: The basic 현행법령 API also failed. Verify the registered OC and the approved access domain/IP, or consult the Law Open Data helpdesk with the sanitized gateway message.',flush=True)
+            print('DIAGNOSIS: If both MINIMAL_CHECK modes fail identically, extra date or page parameters are not the cause. Check provider OC authorization, allowed caller IP/domain, and the gateway response with Law Open Data support.',flush=True)
         for target, params, required in probes:
             try:
                 root=fetch_xml(target,params)
