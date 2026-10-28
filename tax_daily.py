@@ -45,7 +45,7 @@ def fetch_xml(target, extra):
     if not oc:
         raise RuntimeError('LAW_API_OC secret is missing')
     params = dict(OC=oc, target=target, type='XML', display=100, page=1, **extra)
-    print(f'Law API request: target={target}, date_filter={list(extra.keys())}, page=1 (OC hidden)', flush=True)
+    print(f'Law API request: target={target}, parameter_names={sorted(params.keys())}, page=1 (OC hidden)', flush=True)
     req = urllib.request.Request(SEARCH + '?' + urllib.parse.urlencode(params), headers={
         'User-Agent': 'AccountingBriefing/1.0', 'Accept': 'application/xml, text/xml'})
     try:
@@ -74,7 +74,7 @@ def fetch_xml(target, extra):
         message = re.sub(r'https?://\S+', '[URL]', message)
         message = re.sub(r'(?i)(OC|authKey|apiKey)\s*[=:]\s*\S+', r'\1=[REDACTED]', message)
         message = message[:220]
-        raise RuntimeError(f'Law API {target} gateway response: result={result[:30]!r}, msg={message!r}. Check API permission, registered domain/IP and request parameters.')
+        raise RuntimeError(f'Law API {target} gateway response: result={result[:30]!r}, msg={message!r}. Check OC registration, registered domain/IP, and request parameter names. The OC value itself is never logged.')
     txt = ' '.join((root.findtext(t) or '') for t in ('resultMsg', 'message', 'error', 'errorMessage'))
     err = (root.findtext('resultCode') or '').strip()
     if err and err not in ('0', '00', '000', '1', 'SUCCESS', 'success'):
@@ -263,13 +263,25 @@ def main():
         except ValueError:pass
     start=max(earlier) if earlier else end
     if args.check:
-        # Independent probes: a denied amendment feed must not hide whether
-        # the approved NTS interpretation and tax tribunal APIs work.
+        # FIRST check the simplest API category that is explicitly selected on
+        # the application (현행법령 목록 XML). Separate a shared authentication/
+        # gateway problem from target-specific API failures.
+        baseline = ('law', {'query': '법인세법'}, {'법령명한글'})
         ymd=end.strftime('%Y%m%d')
         probes=[('lsHstInf', {'regDt':ymd}, {'법령명한글'}),
                 ('ntsCgmExpc', {'explYd':ymd+'~'+ymd}, {'안건명'}),
                 ('ttSpecialDecc', {'rslYd':ymd+'~'+ymd}, {'사건명'})]
         failures=[]
+        baseline_ok=False
+        name, params, required=baseline
+        try:
+            root=fetch_xml(name,params)
+            rows=read_rows(root,required,name)
+            baseline_ok=True
+            print(f'BASIC_CHECK_OK target=law: {len(rows)} matching rows, response_root={_tag(root)!r}',flush=True)
+        except Exception as exc:
+            print(f'BASIC_CHECK_FAILED target=law: {exc}',flush=True)
+            print('DIAGNOSIS: The basic 현행법령 API also failed. Verify the registered OC and the approved access domain/IP, or consult the Law Open Data helpdesk with the sanitized gateway message.',flush=True)
         for target, params, required in probes:
             try:
                 root=fetch_xml(target,params)
@@ -278,9 +290,9 @@ def main():
             except Exception as exc:
                 failures.append(target)
                 print(f'CHECK_FAILED {target}: {exc}',flush=True)
-        print(f'CHECK_SUMMARY: {len(probes)-len(failures)}/{len(probes)} API categories recognized. No files modified; no OpenAI charge.',flush=True)
-        if failures:
-            raise RuntimeError('One or more law API categories failed: '+', '.join(failures))
+        print(f'CHECK_SUMMARY: basic={"OK" if baseline_ok else "FAILED"}; specialized={len(probes)-len(failures)}/{len(probes)}. No files modified; no OpenAI charge.',flush=True)
+        if not baseline_ok or failures:
+            raise RuntimeError('API check incomplete; see BASIC_CHECK and CHECK_FAILED messages above')
         return
     if start>end:
         print('NO_NEW_WINDOW: no complete dates to collect.',flush=True)
