@@ -14,6 +14,7 @@ import sys
 import urllib.parse
 import urllib.request
 import urllib.error
+import xml.etree.ElementTree as ET
 from zoneinfo import ZoneInfo
 
 from briefing import ROOT, page, formalize, display_text
@@ -51,8 +52,8 @@ def valid_official_link(value):
 def fetch_fss(start, end):
     key = os.environ.get('FSS_API_KEY', '').strip()
     if not key: raise RuntimeError('FSS_API_KEY secret is missing')
-    params = urllib.parse.urlencode({'apiType':'json', 'startDate':start, 'endDate':end, 'authKey':key})
-    req = urllib.request.Request(FSS_ENDPOINT + '?' + params, headers={'User-Agent':'AccountingBriefing/1.0','Accept':'application/json'})
+    params = urllib.parse.urlencode({'apiType':'xml', 'startDate':start, 'endDate':end, 'authKey':key})
+    req = urllib.request.Request(FSS_ENDPOINT + '?' + params, headers={'User-Agent':'AccountingBriefing/1.0','Accept':'application/xml, text/xml, application/json'})
     try:
         with urllib.request.urlopen(req, timeout=45) as response:
             raw = response.read(8_000_001)
@@ -61,13 +62,43 @@ def fetch_fss(start, end):
     except urllib.error.URLError as exc:
         raise RuntimeError('FSS API connection failed; please retry') from None
     if len(raw) > 8_000_000: raise RuntimeError('FSS API payload unexpectedly large')
+    # FSS official guide documents XML as a supported response format.
+    # Parse both XML and JSON, never echo raw HTTP bodies (they may contain secrets).
     try:
-        payload=json.loads(raw.decode('utf-8-sig'))
-    except (UnicodeError, json.JSONDecodeError):
-        raise RuntimeError('FSS API response is not valid JSON') from None
+        decoded = raw.decode('utf-8-sig')
+    except UnicodeDecodeError:
+        try:
+            decoded = raw.decode('euc-kr')
+        except UnicodeDecodeError:
+            raise RuntimeError('FSS API returned an unsupported character encoding') from None
+    stripped = decoded.lstrip()
+    if stripped.startswith(('{', '[')):
+        try:
+            payload = json.loads(stripped)
+        except json.JSONDecodeError:
+            raise RuntimeError('FSS API returned malformed JSON') from None
+    elif stripped.startswith('<?xml') or stripped.startswith('<document') or stripped.startswith('<root'):
+        try:
+            root = ET.fromstring(stripped)
+        except ET.ParseError:
+            raise RuntimeError('FSS API returned malformed XML') from None
+        # Example response: <document><root><resultCode>1</resultCode>...
+        node = root.find('root') if root.tag == 'document' else root
+        if node is None:
+            raise RuntimeError('FSS XML did not contain root element')
+        payload = {child.tag: (child.text or '').strip()
+                   for child in node if child.tag != 'result'}
+        payload['result'] = [
+            {entry.tag: (entry.text or '').strip() for entry in result}
+            for result in node.findall('result')
+        ]
+    elif stripped.lower().startswith(('<!doctype html', '<html', '<head', '<body')):
+        raise RuntimeError('FSS server returned an HTML page, not API data; check API authorization, endpoint and access restrictions')
+    else:
+        raise RuntimeError('FSS API returned an unrecognized response type; confirm API access and response format')
     if not isinstance(payload,dict): raise RuntimeError('FSS API returned unexpected JSON structure')
     code = str(payload.get('resultCode','')).strip()
-    if code and code not in ('00','000','0','200','SUCCESS','success'):
+    if code and code not in ('1','00','000','0','200','SUCCESS','success'):
         # Never print payload: it could include request metadata or secrets.
         raise RuntimeError(f'FSS API error code {code}; verify approval and request parameters')
     records = payload.get('result', [])
