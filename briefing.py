@@ -22,9 +22,12 @@ CATEGORIES = {'fss': '금융감독원 일일 브리핑', 'ifrs': 'K-IFRS·내부
 
 
 def time_range(kind, now):
-    if kind in ('fss', 'ifrs'):
-        # Daily report: include the last seven completed calendar days for weekend/failure catch-up.
-        # Previously published original URLs are deduplicated in save().
+    if kind == 'ifrs':
+        # Publish only prior-calendar-day announcements in each daily briefing.
+        yesterday = (now.date() - dt.timedelta(days=1)).isoformat()
+        return yesterday, yesterday
+    if kind == 'fss':
+        # Keep existing seven-day catch-up until official FSS API is connected.
         yesterday = now.date() - dt.timedelta(days=1)
         return (yesterday - dt.timedelta(days=6)).isoformat(), yesterday.isoformat()
     monday = now.date() - dt.timedelta(days=now.weekday() + 7)
@@ -32,7 +35,7 @@ def time_range(kind, now):
 
 
 def instructions(kind, start, end):
-    prefix = f'한국시간 기준 검색대상기간: {start} ~ {end}. 실제 발표일을 확인한 자료만 포함하라. 금융감독원 일일 브리핑은 전일 미수집 자료도 확보하도록 최근 7일을 검색하며 기존 게시자료는 프로그램에서 중복 제외한다.\\n'
+    prefix = f'한국시간 기준 검색대상기간: {start} ~ {end}. 이 기간에 공식 발표된 자료만 포함하고 더 오래된 발표는 넣지 마라. 원문의 실제 발표일을 확인하라. 금융감독원 브리핑은 기존대로 최근 7일을 검색하며 이미 게시된 원문은 중복 제외한다.\\n'
     if kind == 'fss':
         domain = '금융감독원 공식 보도자료를 우선 확인. 모든 보도자료 중 회계·감사·공시·감리·내부회계 관련 자료를 우선 배치하고, 그 외 중요한 금융감독원 발표도 누락하지 않도록 한다.'
     elif kind == 'ifrs':
@@ -210,6 +213,9 @@ def save(kind, now, start, end, result):
     print(f'Validation: AI returned {len(result["items"])} candidate(s), {len(result.get("_cited_urls", []))} cited URL(s), {len(items)} passed.', flush=True)
     # Never publish a 'no news' article when we cannot prove coverage was complete.
     if not items:
+        if kind == 'ifrs':
+            print('NO_VERIFIED_ITEMS: no verified prior-day announcements; leaving website unchanged. This does not prove no announcements existed.', flush=True)
+            return
         raise RuntimeError('SOURCE_UNAVAILABLE: no verified sources in the search window. This is not proof that no press releases were published; no publication.')
     # Do not re-publish previously published original source URLs.
     prior_urls = set()
