@@ -1,0 +1,62 @@
+name: 세무 일일 공식 API 브리핑
+
+on:
+  schedule:
+    - cron: '15 0 * * *' # Daily at 09:15 KST
+  workflow_dispatch:
+    inputs:
+      check_only:
+        description: 'API 조회만 테스트 (보고서 생성·OpenAI 과금 없음)'
+        type: boolean
+        required: true
+        default: true
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: accounting-briefing-generation
+  cancel-in-progress: false
+
+jobs:
+  generate-tax:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Check law APIs or generate tax briefing
+        env:
+          LAW_API_OC: ${{ secrets.LAW_API_OC }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: gpt-6.1-sol
+          CHECK_ONLY: ${{ github.event_name == 'workflow_dispatch' && inputs.check_only || false }}
+        run: |
+          if [ "$CHECK_ONLY" = "true" ]; then
+            python tax_daily.py --check
+          else
+            python tax_daily.py
+          fi
+      - name: Save report to repository
+        id: save
+        if: github.event_name != 'workflow_dispatch' || inputs.check_only == false
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add posts.json briefings/
+          if [ -f tax_seen.json ]; then git add tax_seen.json; fi
+          if ! git diff --cached --quiet; then
+            git commit -m "Publish daily tax briefing"
+            git pull --rebase origin main
+            git push origin HEAD:main
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Deploy updated website
+        if: steps.save.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run deploy-site.yml --ref main
