@@ -31,19 +31,45 @@ FEEDS = {
 }
 ALLOW_DOMAINS = ('mofe.go.kr', 'customs.go.kr', 'nts.go.kr', 'taxlaw.nts.go.kr')
 # Broad terms such as 신고, 공제, 관세 can occur in unrelated promotions.
-CORE_TERMS = ('법인세','부가가치세','부가세','원천징수','원천세','조세특례','조특법','세법','세제개편',
-              '세무조정','세액공제','손금','익금','과세표준','이전가격','국제조세','세금계산서',
-              '매입세액','유권해석','법령해석','조세심판','관세율','관세평가','관세 환급',
-              'FTA 원산지','세무조사','납세의무','과세처분','국세기본법','관세법','관세 개정')
-EXCLUDE_TERMS = ('할인 행사','할인행사','페스티벌','축제','이벤트','캠페인','채용','공모전',
-                 '교육생 모집','서포터즈','경품','관광','문화행사','콘서트','소비 진작','소비촉진',
-                 '자동차 가격 할인','할인 정보','업무협약','인사 발령')
+# Conservative business-tax source filter. Promotional or general news is excluded
+# even when the article casually mentions a tax-related word.
+TAX_SUBJECTS = (
+    '법인세', '부가가치세', '부가세', '원천징수', '원천세', '조세특례', '조특법',
+    '세법', '세제개편', '세무조정', '세액공제', '세금계산서', '매입세액',
+    '손금', '익금', '과세표준', '이전가격', '국제조세', '국세기본법',
+    '조세심판', '유권해석', '법령해석', '세무조사', '과세처분',
+    '관세법', '관세율', '관세평가', '관세환급', '관세 환급', '수입부가세',
+    '납세의무', '세액감면', '국세청 사전답변', '조세조약',
+)
+SUBSTANTIVE_TOPICS = (
+    '개정', '시행', '입법예고', '행정예고', '법률안', '시행령', '시행규칙',
+    '해석', '예규', '사전답변', '질의회신', '판례', '판결', '심판', '결정',
+    '신고기한', '납부기한', '공제', '감면', '과세', '세액', '세율',
+    '세무조사', '부과', '환급', '손금', '익금', '원천징수', '세무조정',
+    '세금계산서', '세제개편', '징수', '조세특례',
+)
+PROMOTIONAL_OR_ADMIN = (
+    '할인', '페스티벌', '축제', '이벤트', '캠페인', '경품', '기념식',
+    '모집', '채용', '설명회', '전시회', '박람회', '홍보', '서포터즈',
+    '현장 점검', '현장점검', '상담창구', '민원상담', '업무협약',
+    '인사발령', '인사 발령', '장관 방문', '간담회', '소비 진작',
+    '소비촉진', '가격 인하', '가격할인', '고객지원', '체험행사',
+    '수상', '우수기관', '행사 개최', '지자체 축제',
+)
 
 def relevant_title(record):
-    title=clean(record.get('title','')).lower()
-    if not any(x.lower() in title for x in CORE_TERMS):return False
-    if any(x.lower() in title for x in EXCLUDE_TERMS):return False
-    return True
+    title=clean(record.get('title', '')).lower()
+    source=clean(record.get('source', '')).lower()
+    if not title: return False
+    if any(word.lower() in title for word in PROMOTIONAL_OR_ADMIN):
+        return False
+    # Never use the body excerpt alone to infer relevance from incidental tax words.
+    if not any(word.lower() in title for word in TAX_SUBJECTS):
+        return False
+    # Stand-alone law rulings can be substantively relevant without a '개정' verb.
+    if '세법해석사례' in source or '국세법령정보' in source:
+        return True
+    return any(word.lower() in title for word in SUBSTANTIVE_TOPICS)
 
 MAX_NEW = 24
 
@@ -198,13 +224,19 @@ def search_nts(start,end):
     return rows
 
 def analyze(records):
-    prompt='''다음은 공식 기관 RSS 및 공개 원문 검색으로 확인한 세무 관련 후보입니다. 메타데이터·발췌 범위를 넘어 사실을 지어내지 마세요.
-법령 개정의 확정 여부, 유권해석의 결론·시행일 등 원문에 없다면 확정적으로 쓰지 마세요.
-기업 법인세/부가가치세/관세 실무 관련성을 중심으로 한국어 존댓말 2~4문장의 요약과 2~3문장의 검토사항을 작성하세요.
-원문에 충분한 사실이 없다면 확인이 필요한 사항으로 명시하세요. 전문 보고서처럼 간결하고 유용하게 작성하세요.
-각 후보에 대해 기업 세무 직접 관련성이 없으면 include=false로 표시하고 summary, implication은 빈 문자열로 하세요.
-특히 할인·행사·홍보·일반 경제뉴스는 반드시 제외하세요.
-JSON만 반환: {"summary":"실제 선택한 자료만을 종합한 요약", "items":[{"id":"...", "include":true, "summary":"...", "implication":"..."}]}\n자료:\n'''+json.dumps(records,ensure_ascii=False)
+    prompt='''당신은 제조업 법인의 세무 실무자료 편집자입니다. 아래 후보들을 매우 보수적으로 선별하십시오.
+'기업의 세법상 의무 또는 권리, 신고·납부, 세무조정, 세액공제/감면, 과세 및 조세심판 판단에 구체적으로 영향을 주는 공식 신규 발표'만 include=true입니다.
+선정 기준: (1) 법인세·부가가치세·원천세·국제조세·관세의 실질적인 법령/시행령/시행규칙 개정 또는 입법예고,
+(2) 적용 기업에 직접적인 효력이 있는 국세청·관세청 예규/유권해석/심판·판결,
+(3) 기업 신고·납부기한/의무/세율/공제/감면의 실제 변경에 한합니다.
+제외: 행사·축제·쿠폰·할인·정책홍보, 현장점검, 해외직구 상담, 인사·채용, 캠페인, 행정기관 내부 활동, 일반 소비자 보호,
+단순 경제·산업동향, '세금' 언급만 포함된 기사, 기업 세무에 구체적인 변동이 없는 단순 안내.
+중요: 기사 제목에 세무 용어가 있다는 이유만으로 선정하지 마십시오. 직접적인 세법·신고·해석 변경이 문서 발췌에 나타나야 합니다.
+근거 자료가 부족해 실무 영향 여부가 불명확하면 include=false로 하십시오. 실제 발표를 확인하지 못한 세율·시행일·해석 결론을 만들어내지 마십시오.
+선정된 기사만 한국어 존댓말로 정확한 사실 요약 2~4문장, 기업 실무 영향 2~3문장을 쓰되 확인 불가 항목은 원문 확인 필요라고 적으십시오.
+선정 건수가 0이어도 괜찮습니다. JSON 형식 외의 문구를 출력하지 마십시오.
+JSON 형식: {"summary":"선정된 기사에 대한 요약(없으면 빈 문자열)", "items":[{"id":"...", "include":true, "summary":"...", "implication":"..."}]}
+자료:\n'''+json.dumps(records,ensure_ascii=False)
     result=ask_ai(prompt)
     mapped={r['id']:r for r in result.get('items',[]) if isinstance(r,dict) and isinstance(r.get('id'),str)}
     if set(mapped)!={r['id'] for r in records}:raise RuntimeError('AI output IDs did not match candidates; report not published')
@@ -244,6 +276,14 @@ def publish(today,start,end,summary,items,ids):
 def main():
     ap=argparse.ArgumentParser();ap.add_argument('--check',action='store_true');args=ap.parse_args()
     today=dt.datetime.now(ZoneInfo('Asia/Seoul')).date()
+    suppressed_file=ROOT/'tax_excluded_reports.json'
+    if suppressed_file.exists() and not args.check:
+        suppressed=json.loads(suppressed_file.read_text(encoding='utf-8'))
+        if not isinstance(suppressed,list) or not all(isinstance(v,str) for v in suppressed):
+            raise RuntimeError('tax_excluded_reports.json must be a list of date strings')
+        if today.isoformat() in suppressed:
+            print('SUPPRESSED_REPORT: this report date was intentionally removed. No republishing.',flush=True)
+            return
     end=today-dt.timedelta(days=1)
     last=[]
     for p in (ROOT/'briefings').glob('tax-????-??-??.html'):
