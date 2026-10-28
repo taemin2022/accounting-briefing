@@ -45,6 +45,7 @@ def fetch_xml(target, extra):
     if not oc:
         raise RuntimeError('LAW_API_OC secret is missing')
     params = dict(OC=oc, target=target, type='XML', display=100, page=1, **extra)
+    print(f'Law API request: target={target}, date_filter={list(extra.keys())}, page=1 (OC hidden)', flush=True)
     req = urllib.request.Request(SEARCH + '?' + urllib.parse.urlencode(params), headers={
         'User-Agent': 'AccountingBriefing/1.0', 'Accept': 'application/xml, text/xml'})
     try:
@@ -69,20 +70,43 @@ def fetch_xml(target, extra):
     return root
 
 
-def read_rows(root, required_tags):
-    """Return direct record-level XML nodes; never silently treat unexpected XML as no news."""
+def _tag(node):
+    return str(node.tag).split('}')[-1]
+
+
+def _root_diagnostics(root):
+    """Provide a safe schema summary without printing OC or source URLs."""
+    children = [_tag(c) for c in list(root)[:12]]
+    code = next((plain(''.join(c.itertext())) for c in root.iter()
+                 if _tag(c).lower() in ('resultcode', 'errorcode', 'code')), '')
+    msg = next((plain(''.join(c.itertext())) for c in root.iter()
+                if _tag(c).lower() in ('resultmsg', 'errormessage', 'message', 'error', 'errmsg')), '')
+    # Trim free-form messages: some upstream services echo request parameters.
+    # Do not include message content in logs; only indicate whether a message exists.
+    return f'root={_tag(root)!r}, child_tags={children}, code={code[:30]!r}, has_message={bool(msg)}'
+
+
+def read_rows(root, required_tags, target='unknown'):
+    """Accept well-formed empty results and reject unrecognized/failed responses."""
     found = []
     for node in root.iter():
-        tags = {ch.tag.split('}')[-1] for ch in node}
+        tags = {_tag(ch) for ch in node}
         if tags.intersection(required_tags) and len(tags) >= 2 and node is not root:
-            # Only keep lowest matching record, not parent aggregations.
             found.append(node)
+    # A service can return record fields directly at the root for a single result.
+    if not found and {_tag(ch) for ch in root}.intersection(required_tags):
+        found = [root]
+
+    counts = [plain(''.join(el.itertext())) for el in root.iter()
+              if _tag(el).lower() in ('totalcnt', 'totalcount', 'total_cnt')]
+    counts = [c for c in counts if c.isdigit()]
     if not found:
-        cnt = re.search(r'^\d+$', (root.findtext('totalCnt') or '').strip())
-        if cnt and int(cnt.group()) == 0:
+        if counts and all(int(c) == 0 for c in counts):
+            print(f'{target}: zero-result response confirmed by totalCnt=0', flush=True)
             return []
-        raise RuntimeError('Law API response structure was unexpected; check XML records before publishing')
-    # Keep nodes where required fields directly occur; avoid duplicates from nested nodes.
+        # No results without a count can mean an authorization or query error.
+        raise RuntimeError('Law API returned unrecognized XML; '
+                           + _root_diagnostics(root) + '. Confirm API category authorization and request parameters.')
     return found
 
 
@@ -115,7 +139,7 @@ def collect_one_day(day):
     ]
     for target, args, required, source, title_keys, date_keys in source_specs:
         root = fetch_xml(target, args)
-        rows = read_rows(root, required)
+        rows = read_rows(root, required, target)
         total_raw = (root.findtext('totalCnt') or '').strip()
         if total_raw.isdigit() and int(total_raw) > len(rows):
             raise RuntimeError(f'{target} has {total_raw} results, only {len(rows)} returned. Refusing incomplete report.')
@@ -240,7 +264,7 @@ def main():
     new=[r for i,r in unique.items() if i not in seen]
     print(f'Law API: {len(records)} candidates; {len(new)} unseen after ID deduplication.',flush=True)
     if args.check:
-        print('CHECK_OK: three source APIs returned parseable XML. No files modified, no OpenAI costs.',flush=True)
+        print('CHECK_OK: three source APIs returned recognized XML structures. No files modified, no OpenAI costs.',flush=True)
         return
     if not new:
         print('NO_NEW_ITEMS: no new tax materials found; no report created.',flush=True)
