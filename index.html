@@ -39,6 +39,16 @@
     .service h2{font-size:16px;letter-spacing:-.04em;margin:12px 0 6px;word-break:keep-all}
     .service p{font-size:11px;color:var(--muted);line-height:1.6;margin:0;word-break:keep-all}
     .service-rule{height:3px;width:30px;background:var(--orange);border-radius:3px;margin-top:13px}
+
+    .quicklinks{margin-top:18px;background:#fff;border:1px solid var(--line);border-radius:14px;padding:17px 16px;box-shadow:0 8px 24px rgba(10,50,54,.035)}
+    .quicklinks-title{font-size:12px;font-weight:850;letter-spacing:-.025em;margin:0 0 11px;display:flex;gap:8px;align-items:center}
+    .quicklinks-title::before{content:"";display:block;width:4px;height:14px;border-radius:3px;background:var(--orange)}
+    .quicklinks-list{display:grid;gap:7px}
+    .quicklink{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:52px;border:1px solid #E7EEEE;border-radius:10px;padding:10px 11px;background:#FCFEFE;color:var(--ink);text-decoration:none;transition:background .18s,border-color .18s}
+    .quicklink:hover{background:#ECF8F9;border-color:var(--green)}
+    .quicklink b{display:block;font-size:12px;line-height:1.45}
+    .quicklink small{display:block;font-size:10px;color:var(--muted);margin-top:2px;line-height:1.4}
+    .quicklink-arrow{color:var(--green-deep);font-weight:800;font-size:15px;flex:none}
     .archive{min-width:0;min-height:680px;display:flex;flex-direction:column;background:#fff;border:1px solid var(--line);border-radius:17px;padding:28px 30px;box-shadow:0 12px 30px rgba(10,50,54,.03)}
     .archive-heading{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;padding-bottom:19px;border-bottom:1px solid var(--line)}
     .section-eyebrow{font-size:11px;font-weight:800;letter-spacing:.15em;color:var(--green)}
@@ -88,9 +98,9 @@
           <div class="service-rule"></div>
         </button>
         <button type="button" class="service" data-select-kind="ifrs" aria-pressed="false">
-          <div class="service-top"><span class="service-num">02 / WEEKLY BRIEFING</span><span class="frequency">매주 월요일 09:00 목표</span></div>
-          <h2>K-IFRS·내부회계 주간 브리핑</h2>
-          <p>지난주 회계기준 개정, 감독·감리 및 내부회계 주요 동향을 분석합니다.</p>
+          <div class="service-top"><span class="service-num">02 / DAILY BRIEFING</span><span class="frequency">매일 09:00 목표</span></div>
+          <h2>K-IFRS·내부회계 일일 브리핑</h2>
+          <p>최근 회계기준 개정, 감독·감리 및 내부회계 주요 동향을 매일 분석합니다.</p>
           <div class="service-rule"></div>
         </button>
         <button type="button" class="service" data-select-kind="security" aria-pressed="false">
@@ -99,6 +109,15 @@
           <p>CCTV·IP카메라, VMS·NVR, AI 영상분석 및 경쟁사 동향을 정리합니다.</p>
           <div class="service-rule"></div>
         </button>
+      </section>
+      <section class="quicklinks" aria-label="업무 사이트 바로가기">
+        <h2 class="quicklinks-title">업무 바로가기</h2>
+        <div class="quicklinks-list">
+          <a class="quicklink" href="https://dart.fss.or.kr/" target="_blank" rel="noopener noreferrer"><span><b>DART 전자공시시스템</b><small>기업공시 · 사업보고서 · 감사보고서</small></span><span class="quicklink-arrow" aria-hidden="true">↗</span></a>
+          <a class="quicklink" href="https://www.kasb.or.kr/" target="_blank" rel="noopener noreferrer"><span><b>한국회계기준원</b><small>K-IFRS 기준서 · 제·개정 정보</small></span><span class="quicklink-arrow" aria-hidden="true">↗</span></a>
+          <a class="quicklink" href="https://www.fss.or.kr/" target="_blank" rel="noopener noreferrer"><span><b>금융감독원</b><small>보도자료 · 감독 정책 · 감리 동향</small></span><span class="quicklink-arrow" aria-hidden="true">↗</span></a>
+          <a class="quicklink" href="https://taxlaw.nts.go.kr/index.do" target="_blank" rel="noopener noreferrer"><span><b>국세법령정보시스템</b><small>세법 · 해석례 · 판례 · 심판례</small></span><span class="quicklink-arrow" aria-hidden="true">↗</span></a>
+        </div>
       </section>
     </aside>
     <section class="archive" id="archive" aria-label="브리핑 자료실">
@@ -110,7 +129,7 @@
         <div class="filters" aria-label="브리핑 종류 선택">
           <button type="button" class="active" data-kind="all" aria-pressed="true">전체</button>
           <button type="button" data-kind="fss" aria-pressed="false">금융감독원 일일</button>
-          <button type="button" data-kind="ifrs" aria-pressed="false">K-IFRS 주간</button>
+          <button type="button" data-kind="ifrs" aria-pressed="false">K-IFRS 일일</button>
           <button type="button" data-kind="security" aria-pressed="false">보안시장 주간</button>
         </div>
         <input id="search" class="search" type="search" aria-label="브리핑 검색" placeholder="제목 · 내용 검색">
@@ -136,7 +155,7 @@ function draw(){
   list.innerHTML=shown.map(p=>{
     const url=String(p.url??'');
     const safeUrl=/^(?!\/\/)(?!.*(?:^|\/)\.\.\/)([a-zA-Z0-9_./%-]+)$/.test(url)?url:'';
-    return `<article class="post"><div><h3 class="post-title">${esc(p.title)}</h3><small>${esc(p.date)} · ${p.category==='fss'?'금융감독원 일일':p.category==='ifrs'?'K-IFRS 주간':p.category==='security'?'보안시장 주간':'기타'} · ${esc(p.summary||'')}</small></div>${safeUrl?`<a href="${esc(safeUrl)}">브리핑 읽기 →</a>`:''}</article>`;
+    return `<article class="post"><div><h3 class="post-title">${esc(p.title)}</h3><small>${esc(p.date)} · ${p.category==='fss'?'금융감독원 일일':p.category==='ifrs'?'K-IFRS 일일':p.category==='security'?'보안시장 주간':'기타'} · ${esc(p.summary||'')}</small></div>${safeUrl?`<a href="${esc(safeUrl)}">브리핑 읽기 →</a>`:''}</article>`;
   }).join('');
 }
 function selectKind(nextKind){
