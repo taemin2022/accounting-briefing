@@ -61,6 +61,20 @@ def fetch_xml(target, extra):
         root = ET.fromstring(raw)
     except ET.ParseError:
         raise RuntimeError('Law API response was not valid XML; verify the OC and API settings') from None
+    # The Law Open Data gateway also returns <Response><result>...</result><msg>...</msg></Response>
+    # on request or authorization failures. Never mistake this for an empty document feed.
+    if _tag(root).lower() == 'response' and root.find('msg') is not None:
+        result = plain(root.findtext('result'))
+        message = plain(root.findtext('msg'))
+        oc = os.environ.get('LAW_API_OC', '').strip()
+        # Protect OC and URLs if the gateway echoes request data. Do not dump raw XML.
+        if oc:
+            message = message.replace(oc, '[REDACTED]')
+            result = result.replace(oc, '[REDACTED]')
+        message = re.sub(r'https?://\S+', '[URL]', message)
+        message = re.sub(r'(?i)(OC|authKey|apiKey)\s*[=:]\s*\S+', r'\1=[REDACTED]', message)
+        message = message[:220]
+        raise RuntimeError(f'Law API {target} gateway response: result={result[:30]!r}, msg={message!r}. Check API permission, registered domain/IP and request parameters.')
     txt = ' '.join((root.findtext(t) or '') for t in ('resultMsg', 'message', 'error', 'errorMessage'))
     err = (root.findtext('resultCode') or '').strip()
     if err and err not in ('0', '00', '000', '1', 'SUCCESS', 'success'):
@@ -249,7 +263,25 @@ def main():
         except ValueError:pass
     start=max(earlier) if earlier else end
     if args.check:
-        start=end
+        # Independent probes: a denied amendment feed must not hide whether
+        # the approved NTS interpretation and tax tribunal APIs work.
+        ymd=end.strftime('%Y%m%d')
+        probes=[('lsHstInf', {'regDt':ymd}, {'법령명한글'}),
+                ('ntsCgmExpc', {'explYd':ymd+'~'+ymd}, {'안건명'}),
+                ('ttSpecialDecc', {'rslYd':ymd+'~'+ymd}, {'사건명'})]
+        failures=[]
+        for target, params, required in probes:
+            try:
+                root=fetch_xml(target,params)
+                rows=read_rows(root,required,target)
+                print(f'CHECK_OK {target}: {len(rows)} returned rows (page 1)',flush=True)
+            except Exception as exc:
+                failures.append(target)
+                print(f'CHECK_FAILED {target}: {exc}',flush=True)
+        print(f'CHECK_SUMMARY: {len(probes)-len(failures)}/{len(probes)} API categories recognized. No files modified; no OpenAI charge.',flush=True)
+        if failures:
+            raise RuntimeError('One or more law API categories failed: '+', '.join(failures))
+        return
     if start>end:
         print('NO_NEW_WINDOW: no complete dates to collect.',flush=True)
         return
@@ -263,9 +295,6 @@ def main():
     unique={r['id']:r for r in records}
     new=[r for i,r in unique.items() if i not in seen]
     print(f'Law API: {len(records)} candidates; {len(new)} unseen after ID deduplication.',flush=True)
-    if args.check:
-        print('CHECK_OK: three source APIs returned recognized XML structures. No files modified, no OpenAI costs.',flush=True)
-        return
     if not new:
         print('NO_NEW_ITEMS: no new tax materials found; no report created.',flush=True)
         return
