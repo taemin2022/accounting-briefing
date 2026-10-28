@@ -66,11 +66,16 @@
     .search{width:min(230px,100%);border:1px solid #D7E2E4;border-radius:10px;padding:11px 13px;font-size:12px;color:var(--ink);background:#fff}
     .search::placeholder{color:#8A999D}
     .items{display:grid;gap:11px;margin-bottom:22px}
-    .post{padding:18px 19px;border:1px solid var(--line);border-radius:11px;display:flex;align-items:center;justify-content:space-between;gap:20px}
+    .post{border:1px solid var(--line);border-radius:11px;overflow:hidden;transition:border-color .18s,background .18s,box-shadow .18s}
+    .post:has(.post-link):hover{border-color:var(--green);background:#F7FCFC;box-shadow:0 6px 18px rgba(0,153,168,.07)}
+    .post-link{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:18px 19px;color:inherit;text-decoration:none;width:100%;min-height:92px}
+    .post-link:hover{text-decoration:none}
+    .post-link:focus-visible{outline:3px solid var(--orange);outline-offset:-3px}
+    .post-content{min-width:0}
+    .post-cta{color:var(--green-deep);font-size:12px;font-weight:800;white-space:nowrap;flex-shrink:0}
     .post-title{font-size:15px;font-weight:750;line-height:1.5;margin:0 0 9px;letter-spacing:-.02em}
     .post small{font-size:12px;color:var(--muted);line-height:1.7}
-    .post a{color:var(--green-deep);font-size:12px;font-weight:800;text-decoration:none;white-space:nowrap}
-    .post a:hover{text-decoration:underline}
+    .post-link:hover .post-cta{text-decoration:underline}
     .empty{min-height:220px;background:#FBFCFC;border:1px dashed #D7E3E4;border-radius:12px;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:28px}
     .empty-mark{width:48px;height:4px;background:var(--orange);border-radius:4px;margin-bottom:20px}
     .empty strong{font-size:17px;letter-spacing:-.035em}
@@ -80,7 +85,7 @@
     footer{display:flex;justify-content:space-between;gap:15px;flex-wrap:wrap;border-top:1px solid var(--line);padding:14px 0 18px;color:var(--gray);font-size:11px}
     @media(max-width:1100px){.container{width:calc(100% - 36px)}.dashboard{grid-template-columns:260px minmax(0,1fr);gap:16px}.archive{padding:22px}.filters button{padding:9px 9px}.search{width:190px}}
     @media(max-width:850px){.dashboard{grid-template-columns:1fr;padding-top:18px}.sidebar{width:100%}.hero-description{font-size:12px}.services{grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.service{padding:14px}.service h2{font-size:14px}.service-top{align-items:flex-start}.service-num{font-size:9px}.frequency{font-size:9px}.archive{min-height:400px}.nav{margin-bottom:15px}}
-    @media(max-width:650px){.services{grid-template-columns:1fr}.archive{padding:18px}.toolbar{flex-direction:column;align-items:stretch}.search{width:100%}.post{flex-direction:column;align-items:flex-start;gap:10px}.filters{justify-content:center}.filters button{flex:1}.hero-description{margin-bottom:16px}.archive-heading{align-items:flex-start}}
+    @media(max-width:650px){.services{grid-template-columns:1fr}.archive{padding:18px}.toolbar{flex-direction:column;align-items:stretch}.search{width:100%}.post-link{flex-direction:column;align-items:flex-start;gap:10px}.filters{justify-content:center}.filters button{flex:1}.hero-description{margin-bottom:16px}.archive-heading{align-items:flex-start}}
     @media(max-width:390px){.container{width:calc(100% - 24px)}.filters{display:grid;grid-template-columns:1fr 1fr}.archive h2{font-size:21px}}
   </style>
 </head>
@@ -159,7 +164,10 @@ function draw(){
   list.innerHTML=shown.map(p=>{
     const url=String(p.url??'');
     const safeUrl=/^(?!\/\/)(?!.*(?:^|\/)\.\.\/)([a-zA-Z0-9_./%-]+)$/.test(url)?url:'';
-    return `<article class="post"><div><h3 class="post-title">${esc(p.title)}</h3><small>${esc(p.date)} · ${p.category==='fss'?'금융감독원 일일':p.category==='ifrs'?'K-IFRS 일일':p.category==='security'?'보안시장 주간':'기타'} · ${esc(p.summary||'')}</small></div>${safeUrl?`<a href="${esc(safeUrl)}">브리핑 읽기 →</a>`:''}</article>`;
+    const content=`<div class="post-content"><h3 class="post-title">${esc(p.title)}</h3><small>${esc(p.date)} · ${p.category==='fss'?'금융감독원 일일':p.category==='ifrs'?'K-IFRS 일일':p.category==='security'?'보안시장 주간':'기타'} · ${esc(p.summary||'')}</small></div>`;
+    return safeUrl
+      ? `<article class="post"><a class="post-link" href="${esc(safeUrl)}" aria-label="${esc(p.title)} 브리핑 읽기">${content}<span class="post-cta" aria-hidden="true">브리핑 읽기 →</span></a></article>`
+      : `<article class="post"><div class="post-link">${content}</div></article>`;
   }).join('');
 }
 function selectKind(nextKind){
