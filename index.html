@@ -75,7 +75,10 @@
     .post-link:focus-visible{outline:3px solid var(--orange);outline-offset:-3px}
     .post-content{min-width:0}
     .post-cta{color:var(--green-deep);font-size:12px;font-weight:800;white-space:nowrap;flex-shrink:0}
-    .post-title{font-size:15px;font-weight:750;line-height:1.5;margin:0 0 9px;letter-spacing:-.02em}
+    .post-title-row{display:flex;align-items:baseline;justify-content:space-between;gap:16px;margin-bottom:9px}
+    .post-title{font-size:15px;font-weight:750;line-height:1.5;margin:0;letter-spacing:-.02em;flex:0 1 auto;min-width:0}
+    .post-headline{font-size:12px;font-weight:650;line-height:1.55;color:var(--green-deep);text-align:right;flex:1 1 46%;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .post-headline:empty{display:none}
     .post small{font-size:12px;color:var(--muted);line-height:1.7}
     .post-link:hover .post-cta{text-decoration:underline}
     .empty{min-height:220px;background:#FBFCFC;border:1px dashed #D7E3E4;border-radius:12px;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:28px}
@@ -87,7 +90,7 @@
     footer{display:flex;justify-content:space-between;gap:15px;flex-wrap:wrap;border-top:1px solid var(--line);padding:14px 0 18px;color:var(--gray);font-size:11px}
     @media(max-width:1100px){.container{width:calc(100% - 36px)}.dashboard{grid-template-columns:260px minmax(0,1fr);gap:16px}.archive{padding:22px}.filters button{padding:9px 9px}.search{width:190px}}
     @media(max-width:850px){.dashboard{grid-template-columns:1fr;padding-top:18px}.sidebar{width:100%}.hero-description{font-size:12px}.services{grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.service{padding:14px}.service h2{font-size:14px}.service-top{align-items:flex-start}.service-num{font-size:9px}.frequency{font-size:9px}.archive{min-height:400px}.nav{margin-bottom:15px}}
-    @media(max-width:650px){.services{grid-template-columns:1fr}.archive{padding:18px}.toolbar{flex-direction:column;align-items:stretch}.search{width:100%}.post-link{flex-direction:column;align-items:flex-start;gap:10px}.filters{justify-content:center}.filters button{flex:1}.hero-description{margin-bottom:16px}.archive-heading{align-items:flex-start}}
+    @media(max-width:650px){.post-title-row{flex-direction:column;align-items:flex-start;gap:4px}.post-headline{width:100%;text-align:left;flex:auto;max-width:100%}.services{grid-template-columns:1fr}.archive{padding:18px}.toolbar{flex-direction:column;align-items:stretch}.search{width:100%}.post-link{flex-direction:column;align-items:flex-start;gap:10px}.filters{justify-content:center}.filters button{flex:1}.hero-description{margin-bottom:16px}.archive-heading{align-items:flex-start}}
     @media(max-width:390px){.container{width:calc(100% - 24px)}.filters{display:grid;grid-template-columns:1fr 1fr}.archive h2{font-size:21px}}
   </style>
 </head>
@@ -166,7 +169,7 @@ function draw(){
   list.innerHTML=shown.map(p=>{
     const url=String(p.url??'');
     const safeUrl=/^(?!\/\/)(?!.*(?:^|\/)\.\.\/)([a-zA-Z0-9_./%-]+)$/.test(url)?url:'';
-    const content=`<div class="post-content"><h3 class="post-title">${esc(p.title)}</h3><small>${esc(p.date)} · ${p.category==='fss'?'금융감독원 일일':p.category==='ifrs'?'K-IFRS 일일':p.category==='security'?'보안시장 주간':'기타'} · ${esc(p.summary||'')}</small></div>`;
+    const content=`<div class="post-content"><div class="post-title-row"><h3 class="post-title">${esc(p.title)}</h3><span class="post-headline" title="${esc(p.headline||'')}">${esc(p.headline||'')}</span></div><small>${esc(p.date)} · ${p.category==='fss'?'금융감독원 일일':p.category==='ifrs'?'K-IFRS 일일':p.category==='security'?'보안시장 주간':'기타'} · ${esc(p.summary||'')}</small></div>`;
     return safeUrl
       ? `<article class="post"><a class="post-link" href="${esc(safeUrl)}" aria-label="${esc(p.title)} 브리핑 읽기">${content}<span class="post-cta" aria-hidden="true">브리핑 읽기 →</span></a></article>`
       : `<article class="post"><div class="post-link">${content}</div></article>`;
@@ -192,7 +195,27 @@ list.addEventListener('click',event=>{
   window.location.assign(link.href);
 });
 search.addEventListener('input',draw);
-fetch('posts.json',{cache:'no-store'}).then(r=>r.ok?r.json():[]).then(d=>{posts=Array.isArray(d)?d:[];posts.sort((a,b)=>String(b.date??'').localeCompare(String(a.date??'')));draw();}).catch(draw);
+// Existing report HTML already contains each article heading. Read those headings
+// so historical and future posts both show a representative headline.
+async function loadHeadline(post){
+  const url=String(post.url??'');
+  if(!/^(?!\/\/)(?!.*(?:^|\/)\.\.\/)([a-zA-Z0-9_./%-]+)$/.test(url))return;
+  try{
+    const response=await fetch(url,{cache:'no-store'});
+    if(!response.ok)return;
+    const doc=new DOMParser().parseFromString(await response.text(),'text/html');
+    const titles=Array.from(doc.querySelectorAll('article h2'))
+      .map(node=>node.textContent.trim()).filter(Boolean);
+    if(titles.length)post.headline=titles[0]+(titles.length>1?` 외 ${titles.length-1}건`:'');
+  }catch(e){/* The listing stays available even if a report cannot be read. */}
+}
+fetch('posts.json',{cache:'no-store'}).then(r=>r.ok?r.json():[]).then(async d=>{
+  posts=Array.isArray(d)?d:[];
+  posts.sort((a,b)=>String(b.date??'').localeCompare(String(a.date??'')));
+  draw();
+  await Promise.all(posts.map(loadHeadline));
+  draw();
+}).catch(draw);
 draw();
 </script>
 </body>
