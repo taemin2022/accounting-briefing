@@ -65,6 +65,10 @@
     .filters{display:flex;flex-wrap:wrap;gap:4px;padding:5px;background:#F2F6F6;border-radius:11px}
     .filters button{border:0;border-radius:8px;padding:10px 12px;background:transparent;color:var(--muted);font-size:12px;font-weight:700;cursor:pointer;transition:background .15s}
     .filters button:hover{background:#e3eded}
+    .today-only{flex-shrink:0;border:1px solid #C9DBDC;border-radius:9px;background:white;color:#007985;font-size:12px;font-weight:800;padding:10px 13px;cursor:pointer;white-space:nowrap}
+    .today-only:hover{background:#EAF6F7}
+    .today-only.active{background:#007985;color:#fff;border-color:#007985}
+    .today-only:focus-visible{outline:3px solid #FDB914;outline-offset:2px}
     .filters button.active{background:var(--green);color:#fff;box-shadow:0 3px 9px rgba(0,153,168,.14)}
     .search{width:min(230px,100%);border:1px solid #D7E2E4;border-radius:10px;padding:11px 13px;font-size:12px;color:var(--ink);background:#fff}
     .search::placeholder{color:#8A999D}
@@ -93,7 +97,7 @@
     footer{display:flex;justify-content:space-between;gap:15px;flex-wrap:wrap;border-top:1px solid var(--line);padding:14px 0 18px;color:var(--gray);font-size:11px}
     @media(max-width:1100px){.container{width:calc(100% - 36px)}.dashboard{grid-template-columns:260px minmax(0,1fr);gap:16px}.archive{padding:22px}.filters button{padding:9px 9px}.search{width:190px}}
     @media(max-width:850px){.dashboard{grid-template-columns:1fr;padding-top:18px}.sidebar{width:100%}.hero-description{font-size:12px}.services{grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.service{padding:14px}.service h2{font-size:14px}.service-top{align-items:flex-start}.service-num{font-size:9px}.frequency{font-size:9px}.archive{min-height:400px}.nav{margin-bottom:15px}}
-    @media(max-width:650px){.post-title-row{flex-direction:column;align-items:flex-start;gap:4px}.post-headline{width:100%;text-align:left;flex:auto;max-width:100%}.services{grid-template-columns:1fr}.archive{padding:18px}.toolbar{flex-direction:column;align-items:stretch}.search{width:100%}.post-link{flex-direction:column;align-items:flex-start;gap:10px}.filters{justify-content:center}.filters button{flex:1}.hero-description{margin-bottom:16px}.archive-heading{align-items:flex-start}}
+    @media(max-width:650px){.post-title-row{flex-direction:column;align-items:flex-start;gap:4px}.post-headline{width:100%;text-align:left;flex:auto;max-width:100%}.services{grid-template-columns:1fr}.archive{padding:18px}.toolbar{flex-direction:column;align-items:stretch}.today-only{align-self:flex-start}.search{width:100%}.post-link{flex-direction:column;align-items:flex-start;gap:10px}.filters{justify-content:center}.filters button{flex:1}.hero-description{margin-bottom:16px}.archive-heading{align-items:flex-start}}
     @media(max-width:390px){.container{width:calc(100% - 24px)}.filters{display:grid;grid-template-columns:1fr 1fr}.archive h2{font-size:21px}}
   </style>
 </head>
@@ -109,19 +113,19 @@
       </div>
       <section class="services" aria-label="브리핑 종류 선택">
         <button type="button" class="service" data-select-kind="fss" aria-pressed="false">
-          <div class="service-top"><span class="service-num">01 / DAILY BRIEFING</span><span class="frequency">매일 09:30 업데이트</span></div>
+          <div class="service-top"><span class="service-num">01 / DAILY BRIEFING</span><span class="frequency">매일 07:10 업데이트</span></div>
           <h2>금융감독원 일일 브리핑</h2>
           <p>주요 보도자료와 회계·내부회계 관련 실무 검토 포인트를 정리합니다.</p>
           <div class="service-rule"></div>
         </button>
         <button type="button" class="service" data-select-kind="ifrs" aria-pressed="false">
-          <div class="service-top"><span class="service-num">02 / DAILY BRIEFING</span><span class="frequency">매일 09:00 업데이트</span></div>
+          <div class="service-top"><span class="service-num">02 / DAILY BRIEFING</span><span class="frequency">매일 07:05 업데이트</span></div>
           <h2>K-IFRS·내부회계 일일 브리핑</h2>
           <p>최근 회계기준 개정, 감독·감리 및 내부회계 주요 동향을 매일 분석합니다.</p>
           <div class="service-rule"></div>
         </button>
         <button type="button" class="service" data-select-kind="tax" aria-pressed="false">
-          <div class="service-top"><span class="service-num">03 / TAX INTELLIGENCE</span><span class="frequency">매일 09:15 업데이트</span></div>
+          <div class="service-top"><span class="service-num">03 / TAX INTELLIGENCE</span><span class="frequency">매일 07:10 업데이트</span></div>
           <h2>세무 일일 브리핑</h2>
           <p>기업 세무 실무와 직접 관련된 세법 개정, 국세청 예규·해석, 조세심판례만 선별해 정리합니다.</p>
           <div class="service-rule"></div>
@@ -156,6 +160,7 @@
           <button type="button" data-kind="tax" aria-pressed="false">세무 일일</button>
           <button type="button" data-kind="security" aria-pressed="false">보안시장 주간</button>
         </div>
+        <button type="button" id="today-only" class="today-only" aria-pressed="false" title="한국시간 기준 오늘 게시된 브리핑만 보기">오늘 자료만 보기</button>
         <input id="search" class="search" type="search" aria-label="브리핑 검색" placeholder="제목 · 내용 검색">
       </div>
       <div id="list" class="items"></div>
@@ -165,15 +170,17 @@
   <footer class="container"><span>© Accounting &amp; Internal Control AI Briefing</span><span>금융감독원 · K-IFRS · 세무 · 보안시장 동향</span></footer>
 <script>
 'use strict';
-let posts=[],kind='all';
+let posts=[],kind='all',todayOnly=false;
+const todayKST=()=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 const list=document.getElementById('list'),search=document.getElementById('search');
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function draw(){
   const q=search.value.trim().toLocaleLowerCase();
-  const shown=posts.filter(p=>(kind==='all'||p.category===kind)&&`${p.title??''} ${p.summary??''}`.toLocaleLowerCase().includes(q));
+  const today=todayKST();
+  const shown=posts.filter(p=>(kind==='all'||p.category===kind)&&(!todayOnly||p.date===today)&&`${p.title??''} ${p.summary??''}`.toLocaleLowerCase().includes(q));
   document.getElementById('count').textContent=`게시글 ${shown.length}건`;
   if(!shown.length){
-    list.innerHTML=`<div class="empty"><div class="empty-mark"></div><strong>${posts.length?'검색 결과가 없습니다':'아직 게시된 브리핑이 없습니다'}</strong><p>${posts.length?'다른 검색어 또는 분류를 선택해 주세요.':'AI 브리핑 자동 게시 기능 연결 후 이곳에 자료가 표시됩니다.'}</p></div>`;
+    list.innerHTML=`<div class="empty"><div class="empty-mark"></div><strong>${todayOnly?'오늘 게시된 브리핑이 없습니다':posts.length?'검색 결과가 없습니다':'아직 게시된 브리핑이 없습니다'}</strong><p>${todayOnly?'한국시간 기준 오늘 게시된 브리핑만 표시합니다. 필터를 해제하면 과거 자료도 볼 수 있습니다.':posts.length?'다른 검색어 또는 분류를 선택해 주세요.':'AI 브리핑 자동 게시 기능 연결 후 이곳에 자료가 표시됩니다.'}</p></div>`;
     return;
   }
   list.innerHTML=shown.map(p=>{
@@ -192,6 +199,12 @@ function selectKind(nextKind){
   draw();
 }
 document.querySelectorAll('[data-kind]').forEach(b=>b.addEventListener('click',()=>selectKind(b.dataset.kind)));
+document.getElementById('today-only').addEventListener('click',event=>{
+  todayOnly=!todayOnly;
+  event.currentTarget.classList.toggle('active',todayOnly);
+  event.currentTarget.setAttribute('aria-pressed',String(todayOnly));
+  draw();
+});
 document.querySelectorAll('[data-select-kind]').forEach(b=>b.addEventListener('click',()=>{
   selectKind(b.dataset.selectKind);
   if(window.matchMedia('(max-width: 850px)').matches){document.getElementById('archive').scrollIntoView({behavior:'smooth',block:'start'});}
