@@ -39,7 +39,15 @@ def instructions(kind, start, end):
     if kind == 'fss':
         domain = '금융감독원 공식 보도자료를 우선 확인. 모든 보도자료 중 회계·감사·공시·감리·내부회계 관련 자료를 우선 배치하고, 그 외 중요한 금융감독원 발표도 누락하지 않도록 한다.'
     elif kind == 'ifrs':
-        domain = 'K-IFRS/IFRS와 내부회계관리제도 관련 새 발표와 공식 개정, 금융감독원·한국회계기준원·IFRS Foundation 발표, 감사·감리 동향을 확인한다. 특히 K-IFRS 1118(=IFRS 18), 1115, 1002, 1116, 연결내부회계, ITGC 실무 영향을 분석한다. 발표일·효력발생일·적용 대상과 회계·통제 활동 영향을 구분하여 구체적으로 설명한다.'
+        domain = ('검색을 하나의 광범위한 질의에 의존하지 말고 아래 공식 출처를 기관별로 별도 검색하라: '
+                  '① 한국회계기준원 kasb.or.kr(회계기준 제·개정·공개초안·보도자료), '
+                  '② 금융위원회 fsc.go.kr 및 금융감독원 fss.or.kr(회계·감리·공시·내부회계 감독), '
+                  '③ IFRS Foundation ifrs.org(기준서 발표·IASB 프로젝트), '
+                  '④ 한국공인회계사회 kicpa.or.kr(공식 감사·내부회계 발표). '
+                  '각 기관별로 검색대상기간의 공지·보도자료가 실제 게시됐는지 확인하라. '
+                  'K-IFRS 1118, 1115, 1002, 1116, 연결내부회계 및 ITGC 실무 관련 신규 발표를 우선 분석하라. '
+                  '기존 기준서 설명이나 이전 발표를 어제 발표한 것으로 오인하지 마라. '
+                  '기관 공식 발표일과 기준서 효력발생일을 엄격히 구분하고, 대상기간 발표일을 증명하지 못하면 포함하지 마라.')
     else:
         domain = '국내외 CCTV/IP카메라, VMS/NVR, AI 영상분석, VSaaS, 출입통제, 이미지센서, 입찰/RFP, 규제 및 경쟁사(Axis, Hanwha Vision, Hikvision, Dahua, i-PRO, Genetec, Milestone) 동향을 확인하고 제조사 관점의 시사점을 분석한다.'
     return (prefix + domain + '\n웹 검색을 사용해 실제 원문 링크를 찾아라. 출처가 없는 문서는 절대 생성하지 마라. 불확실한 내용은 제외하라. '
@@ -52,7 +60,7 @@ def instructions(kind, start, end):
             '품질 우선, 상세 자료가 있으면 3~10건, 미확인 자료를 억지로 채우지 않는다. ''반드시 모든 문장을 정중한 보고서 문체(~습니다, ~합니다, ~입니다)로 종결하라. 해라체(~다, ~한다, ~했다, ~필요가 있다)로 끝내지 마라. ''summary와 implication에는 출처 도메인, URL, 마크다운 링크를 삽입하지 마라. 링크는 url 필드에만 넣어라.')
 
 
-def request_ai(kind, start, end):
+def request_ai(kind, start, end, extra_instructions=None):
     key = os.getenv('OPENAI_API_KEY')
     if not key:
         raise RuntimeError('OPENAI_API_KEY secret is missing')
@@ -60,7 +68,7 @@ def request_ai(kind, start, end):
             'tools': [{'type': 'web_search', **({'filters': {'allowed_domains': ['fss.or.kr']}} if kind == 'fss' else {})}],
             'include': ['web_search_call.action.sources'],
             'tool_choice': 'auto',
-            'input': instructions(kind, start, end),
+            'input': extra_instructions if extra_instructions is not None else instructions(kind, start, end),
             'max_output_tokens': 6500}
     req = urllib.request.Request(API, data=json.dumps(data, ensure_ascii=False).encode(),
         headers={'Authorization': f'Bearer {key}', 'Content-Type': 'application/json'}, method='POST')
@@ -101,6 +109,65 @@ def request_ai(kind, start, end):
     result['_cited_urls'] = cited
     return result
 
+
+
+def request_ifrs_with_agency_fallback(start, end):
+    """Search official channels in two rounds, then verify URLs in save().
+
+    Primary round checks multiple agencies. If zero candidates, separate agency
+    checks reduce empty results caused by one oversized/ambiguous search task.
+    All rounds retain strict date/source validation; no invented articles.
+    """
+    print('IFRS_SEARCH: primary official-agency scan', flush=True)
+    first = request_ai('ifrs', start, end)
+    if first.get('items'):
+        print(f'IFRS_SEARCH: primary returned {len(first["items"])} candidate(s)', flush=True)
+        return first
+    print('IFRS_SEARCH: primary returned 0; running 2 targeted official-agency rescans', flush=True)
+
+    agency_queries = [
+        ('KASB_FSC_FSS',
+         f'한국시간 {start}~{end} 사이에 새로 발표된 공식 자료만 조사하라. '
+         '우선 site:kasb.or.kr 에서 K-IFRS 제·개정, 공개초안, 기준서 해설과 공지 검색. '
+         '별도로 site:fsc.go.kr 및 site:fss.or.kr 에서 내부회계관리제도, 회계감리, '
+         '회계기준 감독, 감사 관련 당일 발표를 검색. 기관별로 여러 번 검색하라.'),
+        ('IFRS_KICPA',
+         f'한국시간 {start}~{end} 사이에 새로 발표된 공식 자료만 조사하라. '
+         'site:ifrs.org 의 IASB/IFRS Foundation IFRS 회계기준 새 발표, '
+         'site:kicpa.or.kr 의 공인회계사회 공식 내부회계/외감 자료를 각각 검색하라. '
+         '국내 기업회계에 직접 영향 있는 새 발표만 포함한다.'),
+    ]
+    combined=[]
+    urls=set(first.get('_cited_urls',set()))
+    for label, focus in agency_queries:
+        prompt=(focus + '\n' +
+            '발표일은 반드시 공식 원문에서 직접 확인하고 검색 결과의 색인일과 혼동하지 마라. '
+            '대상일이 아니거나 발표일이 불분명한 자료는 반드시 제외한다. '
+            '다른 기관의 발표를 인용한 2차 기사와 일반 해설은 제외한다. '
+            '자료가 확인되지 않을 경우 빈 items 배열을 반환하라. '
+            '반드시 JSON 객체만 출력하라. 스키마: '
+            '{"title":"K-IFRS·내부회계 일일 브리핑","summary":"전체 요약",'
+            '"items":[{"title":"제목","date":"YYYY-MM-DD","summary":"확인된 사실 2~4문장",'
+            '"implication":"실무 검토사항 2~3문장","url":"https://원문"}]}. '
+            '한국어 문장은 모두 정중한 ~습니다/~합니다 문체로 작성하고 URL을 본문에 넣지 마라.')
+        try:
+            result=request_ai('ifrs', start, end, extra_instructions=prompt)
+        except RuntimeError as exc:
+            # Fail closed if the official-source scan cannot be completed.
+            raise RuntimeError(f'IFRS_SEARCH {label} failed; publication aborted: {exc}') from exc
+        print(f'IFRS_SEARCH: {label} returned {len(result["items"])} candidate(s)', flush=True)
+        combined.extend(result.get('items', []))
+        urls.update(result.get('_cited_urls',set()))
+    uniq={}
+    for item in combined:
+        if isinstance(item,dict):
+            key=(str(item.get('url','')),str(item.get('date','')))
+            uniq.setdefault(key,item)
+    print(f'IFRS_SEARCH: total {len(uniq)} unique candidate(s) after targeted rescans', flush=True)
+    return {'title':'K-IFRS·내부회계 일일 브리핑',
+            'summary':('공식기관별 검색에서 확인된 전일 발표 자료를 정리했습니다.' if uniq else
+                       '공식기관별 재검색에서 검증 가능한 전일 신규 자료를 확인하지 못했습니다.'),
+            'items':list(uniq.values()),'_cited_urls':urls}
 
 def normalize_url(url):
     parts = urllib.parse.urlsplit(url)
@@ -262,7 +329,7 @@ def main():
     for kind in kinds:
         start,end = time_range(kind,now)
         print(f'Generating {kind}: {start} to {end}')
-        result = request_ai(kind,start,end)
+        result = request_ifrs_with_agency_fallback(start,end) if kind == 'ifrs' else request_ai(kind,start,end)
         save(kind,now,start,end,result)
 
 if __name__ == '__main__':
