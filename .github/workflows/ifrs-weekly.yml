@@ -2,7 +2,7 @@ name: K-IFRS·내부회계 일일 자동 브리핑
 
 on:
   schedule:
-    - cron: '0 0 * * *' # Every day 09:00 KST (UTC 00:00)
+    - cron: '5 22 * * *' # Every day 07:05 KST (previous day UTC 22:05)
   workflow_dispatch:
 
 permissions:
@@ -38,9 +38,12 @@ jobs:
             git commit -m "Publish K-IFRS daily briefing"
             git push
             echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "No new briefing to commit"
+          fi
       - name: Trigger website deployment
         if: steps.save.outputs.changed == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh workflow run deploy-site.yml --ref main
-          fi
