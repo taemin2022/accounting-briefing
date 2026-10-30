@@ -99,6 +99,54 @@
     @media(max-width:850px){.dashboard{grid-template-columns:1fr;padding-top:18px}.sidebar{width:100%}.hero-description{font-size:12px}.services{grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.service{padding:14px}.service h2{font-size:14px}.service-top{align-items:flex-start}.service-num{font-size:9px}.frequency{font-size:9px}.archive{min-height:400px}.nav{margin-bottom:15px}}
     @media(max-width:650px){.post-title-row{flex-direction:column;align-items:flex-start;gap:4px}.post-headline{width:100%;text-align:left;flex:auto;max-width:100%}.services{grid-template-columns:1fr}.archive{padding:18px}.toolbar{flex-direction:column;align-items:stretch}.today-only{align-self:flex-start}.search{margin-left:0;width:100%}.post-link{flex-direction:column;align-items:flex-start;gap:10px}.filters{justify-content:center}.filters button{flex:1}.hero-description{margin-bottom:16px}.archive-heading{align-items:flex-start}}
     @media(max-width:390px){.container{width:calc(100% - 24px)}.filters{display:grid;grid-template-columns:1fr 1fr}.archive h2{font-size:21px}}
+
+    /* Mobile-only layout: compact 2x2 briefing tiles -> library -> quick links. */
+    @media (max-width:850px) {
+      .dashboard {display:flex;flex-direction:column;align-items:stretch;gap:0;padding-top:12px}
+      .sidebar {display:contents}
+      .nav {order:0;margin:0 0 10px}
+      .hero {order:1}
+      .hero h1 {font-size:clamp(19px,5vw,24px);margin:7px 0 4px}
+      .hero-description {font-size:11px;margin:0 0 12px;line-height:1.45}
+      .kicker {font-size:9px}
+      .services {order:2;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-bottom:13px}
+      .service {padding:11px 11px 10px;border-radius:12px;min-height:93px;box-shadow:none}
+      .service-top, .service[data-select-kind="tax"] .service-top, .service[data-select-kind="security"] .service-top {display:flex;flex-direction:column;align-items:flex-start;gap:5px;flex-wrap:nowrap}
+      .service-num, .service[data-select-kind="tax"] .service-num, .service[data-select-kind="security"] .service-num {font-size:8px;letter-spacing:.02em;white-space:nowrap}
+      .frequency, .service[data-select-kind="tax"] .frequency, .service[data-select-kind="security"] .frequency {font-size:8px;letter-spacing:-.02em;padding:2px 6px;white-space:nowrap}
+      .service h2 {font-size:12px;margin:8px 0 0;line-height:1.34;letter-spacing:-.035em}
+      .service p, .service-rule {display:none}
+      .archive {order:3;min-height:0;padding:16px 13px;border-radius:13px;box-shadow:none}
+      .archive-heading {padding-bottom:11px}
+      .archive h2 {font-size:22px;margin-top:3px}
+      .section-eyebrow {font-size:9px}
+      .count {font-size:10px}
+      .toolbar {margin:12px 0;gap:8px}
+      .filters {width:100%;display:flex;justify-content:flex-start;flex-wrap:wrap;gap:3px;padding:4px}
+      .filters button {flex:0 1 auto;padding:7px 9px;font-size:10px}
+      .today-only {font-size:11px;padding:8px 10px}
+      .search {margin-left:0;width:100%;padding:10px 12px}
+      .items {gap:9px}
+      .post-link {padding:12px 13px;min-height:0;gap:7px}
+      .post-title {font-size:13px}
+      .post-headline, .post small {font-size:11px}
+      .post-cta {font-size:11px}
+      .notice {font-size:10px;padding:11px 12px;margin-top:0}
+      .quicklinks {order:4;margin:13px 0 4px;padding:14px;border-radius:12px;box-shadow:none}
+      .quicklinks-list {grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+      .quicklink {min-height:58px;padding:8px 9px;align-items:center}
+      .quicklink b {font-size:11px}
+      .quicklink small {font-size:9px}
+      footer {font-size:9px}
+    }
+    @media (max-width:390px) {
+      .services {grid-template-columns:repeat(2,minmax(0,1fr))}
+      .filters {display:flex;grid-template-columns:none}
+      .filters button {flex:0 1 auto}
+      .quicklinks-list {grid-template-columns:1fr}
+      .service {padding:10px 9px}
+      .service h2 {font-size:11.5px}
+    }
   </style>
 </head>
 <body>
