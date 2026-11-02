@@ -30,46 +30,70 @@ FEEDS = {
     '관세청 행정규칙 예고': 'https://www.customs.go.kr/kcs/selectBoardRss.do?mi=2897&bbsId=1366',
 }
 ALLOW_DOMAINS = ('mofe.go.kr', 'customs.go.kr', 'nts.go.kr', 'taxlaw.nts.go.kr')
-# Broad terms such as 신고, 공제, 관세 can occur in unrelated promotions.
-# Conservative business-tax source filter. Promotional or general news is excluded
-# even when the article casually mentions a tax-related word.
+# Business tax relevance: broader subject coverage, but reject promotions.
+# Title alone is not enough to confirm significance; AI reviews collected excerpts.
 TAX_SUBJECTS = (
     '법인세', '부가가치세', '부가세', '원천징수', '원천세', '조세특례', '조특법',
-    '세법', '세제개편', '세무조정', '세액공제', '세금계산서', '매입세액',
-    '손금', '익금', '과세표준', '이전가격', '국제조세', '국세기본법',
-    '조세심판', '유권해석', '법령해석', '세무조사', '과세처분',
-    '관세법', '관세율', '관세평가', '관세환급', '관세 환급', '수입부가세',
-    '납세의무', '세액감면', '국세청 사전답변', '조세조약',
+    '세법', '세제', '세무', '세무조정', '세액공제', '세액감면', '세금계산서',
+    '전자세금계산서', '매입세액', '손금', '익금', '과세표준', '이전가격',
+    '국제조세', '국세기본법', '조세심판', '과세처분', '납세의무',
+    '법령해석', '유권해석', '사전답변', '질의회신', '세무조사', '조세조약',
+    '관세법', '관세율', '관세평가', '관세환급', '수입부가세', '통관',
+    '원산지', 'FTA', '기업 세부담', '신고납부', '신고 안내', '납부기한',
+    '신고기한', '부과제척기간', '가산세', '경정청구', '수정신고',
+    '조세불복', '공제감면',
 )
-SUBSTANTIVE_TOPICS = (
+BUSINESS_CONTEXT = (
+    '기업', '법인', '사업자', '수출', '수입', '사업장', '제조', '중소기업',
+    '납세자', '거래', '외국법인', '국내법인', '국외', '신고', '납부',
+    '세액', '공제', '세무', '과세', '가산세', '조세', '장부', '해석',
+)
+TAX_ACTIONS = (
     '개정', '시행', '입법예고', '행정예고', '법률안', '시행령', '시행규칙',
     '해석', '예규', '사전답변', '질의회신', '판례', '판결', '심판', '결정',
-    '신고기한', '납부기한', '공제', '감면', '과세', '세액', '세율',
-    '세무조사', '부과', '환급', '손금', '익금', '원천징수', '세무조정',
-    '세금계산서', '세제개편', '징수', '조세특례',
+    '신고', '납부', '신청', '절차', '안내', '기한', '연장', '정정', '변경',
+    '공제', '감면', '과세', '세액', '세율', '환급', '징수', '조사',
+    '신고서', '세무조정', '세금계산서', '추징', '불복', '경정',
 )
 PROMOTIONAL_OR_ADMIN = (
-    '할인', '페스티벌', '축제', '이벤트', '캠페인', '경품', '기념식',
-    '모집', '채용', '설명회', '전시회', '박람회', '홍보', '서포터즈',
-    '현장 점검', '현장점검', '상담창구', '민원상담', '업무협약',
-    '인사발령', '인사 발령', '장관 방문', '간담회', '소비 진작',
-    '소비촉진', '가격 인하', '가격할인', '고객지원', '체험행사',
-    '수상', '우수기관', '행사 개최', '지자체 축제',
+    '페스티벌', '축제', '이벤트', '캠페인', '경품', '기념식',
+    '채용', '서포터즈', '체험행사', '장관 방문', '소비촉진',
+    '소비 진작', '가격 인하', '가격할인', '할인 행사', '할인행사',
+    '고객지원센터', '해외직구 상담', '현장점검', '현장 점검',
+    '상담창구', '민원상담', '업무협약', '인사발령', '인사 발령',
+    '수상', '우수기관', '행사 개최', '관광', '특판',
 )
 
 def relevant_title(record):
-    title=clean(record.get('title', '')).lower()
-    source=clean(record.get('source', '')).lower()
-    if not title: return False
+    """Broad candidate filter; final inclusion still requires AI evidence review."""
+    title = clean(record.get('title', '')).lower()
+    excerpt = clean(record.get('excerpt', '')).lower()
+    source = clean(record.get('source', '')).lower()
+    if not title:
+        return False
     if any(word.lower() in title for word in PROMOTIONAL_OR_ADMIN):
         return False
-    # Never use the body excerpt alone to infer relevance from incidental tax words.
-    if not any(word.lower() in title for word in TAX_SUBJECTS):
-        return False
-    # Stand-alone law rulings can be substantively relevant without a '개정' verb.
-    if '세법해석사례' in source or '국세법령정보' in source:
+
+    title_has_tax = any(word.lower() in title for word in TAX_SUBJECTS)
+    if title_has_tax:
+        # A subject alone qualifies for review: useful rulings and practical notices
+        # often omit "개정", "시행", etc. from their titles.
         return True
-    return any(word.lower() in title for word in SUBSTANTIVE_TOPICS)
+
+    # Source-specific, official tax interpretation material may have a generic
+    # case title; inspect its excerpt before passing it to the AI reviewer.
+    tax_interpretation_source = (
+        '세법해석사례' in source or '국세법령정보' in source
+        or '조세심판' in source
+    )
+    if tax_interpretation_source:
+        return (
+            any(word.lower() in excerpt for word in TAX_SUBJECTS)
+            and any(word.lower() in (title + ' ' + excerpt) for word in BUSINESS_CONTEXT)
+        )
+
+    # Generic announcement titles without a clear tax connection are not passed.
+    return False
 
 MAX_NEW = 24
 
@@ -224,22 +248,24 @@ def search_nts(start,end):
     return rows
 
 def analyze(records):
-    prompt='''당신은 제조업 법인의 세무 실무자료 편집자입니다. 아래 후보들을 매우 보수적으로 선별하십시오.
-'기업의 세법상 의무 또는 권리, 신고·납부, 세무조정, 세액공제/감면, 과세 및 조세심판 판단에 구체적으로 영향을 주는 공식 신규 발표'만 include=true입니다.
-선정 기준: (1) 법인세·부가가치세·원천세·국제조세·관세의 실질적인 법령/시행령/시행규칙 개정 또는 입법예고,
-(2) 적용 기업에 직접적인 효력이 있는 국세청·관세청 예규/유권해석/심판·판결,
-(3) 기업 신고·납부기한/의무/세율/공제/감면의 실제 변경에 한합니다.
-제외: 행사·축제·쿠폰·할인·정책홍보, 현장점검, 해외직구 상담, 인사·채용, 캠페인, 행정기관 내부 활동, 일반 소비자 보호,
-단순 경제·산업동향, '세금' 언급만 포함된 기사, 기업 세무에 구체적인 변동이 없는 단순 안내.
-중요: 기사 제목에 세무 용어가 있다는 이유만으로 선정하지 마십시오. 직접적인 세법·신고·해석 변경이 문서 발췌에 나타나야 합니다.
-근거 자료가 부족해 실무 영향 여부가 불명확하면 include=false로 하십시오. 실제 발표를 확인하지 못한 세율·시행일·해석 결론을 만들어내지 마십시오.
-선정된 기사만 한국어 존댓말로 다음 수준으로 작성하십시오.
-summary는 사실 3~5문장으로 [공식 발표 주체/내용], [기존 제도 대비 변경점], [대상 법인·거래], [발표일과 시행일 구별], [수치·기한·경과규정] 중 원문에서 확인된 항목을 구체적으로 다룹니다.
-implication은 기업 실무 관점 3~5문장으로 법인세 신고·세무조정, 부가가치세·세금계산서, 원천세, 국제조세·관세, 세액공제 검토사항 중 실제 관련 있는 것만 선택합니다.
-실무 담당자가 확인할 증빙, 신고기한, 계정/프로세스, 세액 계산 및 내부통제 검토 절차를 자료가 뒷받침하는 범위에서 제안하십시오.
-확정 법령·입법예고·해석사례·심판 결정의 법적 상태를 명확히 구분하고, 다른 기업에 자동 적용되는 것처럼 해석하지 마십시오.
-중요한 사실·법령·조문·수치·시행일이 제공 자료에 없으면 추측하지 말고 명시적으로 확인 불가라고 쓰십시오. 광고성/소비자 행사성 자료는 계속 제외하십시오.
-선정 건수가 0이어도 괜찮습니다. JSON 형식 외의 문구를 출력하지 마십시오.
+    prompt='''당신은 한국 제조업 법인의 회계·세무 실무 브리핑 편집자입니다. 아래 공식자료를 기업 세무 실무 관점에서 판단하십시오.
+포함 기준을 지나치게 엄격하게 적용하지 마십시오. 기존 법령이 개정되지 않았더라도,
+(1) 법인세·부가가치세·원천세·국제조세·관세 등 기업에 적용 가능한 법령·시행령·고시의 개정 및 입법예고,
+(2) 기업 세무조정, 손금·익금, 세액공제/감면, 원천징수, 세금계산서, 관세·통관의 실무 판단에 참고할 만한 국세청 예규·해석·사전답변·판례·심판례,
+(3) 기업의 신고·납부 일정, 제출서류, 전자신고 절차, 증빙 및 세무행정상 유의사항을 설명하거나 변경한 공식 안내,
+(4) 기업 세무담당자가 참고할 만한 세무조사 쟁점, 국제조세/이전가격, 수출입 관세 관련 해설·사례
+중 어느 하나에 해당하며, 제공된 공식 제목·내용에 객관적 근거가 있으면 include=true로 판단하십시오.
+제도의 변경이 없어도 실무적 참고가치가 분명한 공식 해석례와 신고 안내는 포함할 수 있습니다.
+다만 제목에 세무 단어만 있다는 이유로 자동 포함하지 말고, 구체적인 기업 실무 쟁점이 있는지 확인하십시오.
+반드시 제외: 일반 소비자 할인·쿠폰·축제·행사, 물가·소비촉진 홍보, 해외직구 민원·상담,
+인사·채용·기관 방문·단순 협약, 기업 세무와 직접 관련 없는 일반 경제·관세 행정 뉴스.
+확실한 관련성이 없으면 include=false로 하되, 기존 법령 개정 여부만으로 배제하지 마십시오.
+원문에 없는 세율, 시행일, 세무 효과, 해석 결론을 만들어내지 마십시오.
+선정된 기사만 공손한 한국어(~습니다)로 작성하십시오.
+summary는 사실 3~5문장: 공식 발표기관, 주요 내용, 대상 기업·거래, 발표일과 적용일의 구분, 주요 수치·절차를 확인 가능한 범위에서 제시하십시오.
+implication은 3~5문장: 기업 담당자의 신고·증빙·세무조정·자금·내부통제 중 실제 관련되는 확인 포인트를 구체적으로 제시하십시오.
+입법예고·확정 개정·해석사례·개별 심판결정의 법적 상태와 일반적 적용 가능성을 구분하십시오.
+선정 건수가 0이어도 괜찮습니다. JSON 형식 외 문구는 출력하지 마십시오.
 JSON 형식: {"summary":"선정된 기사에 대한 요약(없으면 빈 문자열)", "items":[{"id":"...", "include":true, "summary":"...", "implication":"..."}]}
 자료:\n'''+json.dumps(records,ensure_ascii=False)
     result=ask_ai(prompt)
