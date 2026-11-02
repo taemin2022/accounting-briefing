@@ -55,6 +55,18 @@ TAX_ACTIONS = (
     '공제', '감면', '과세', '세액', '세율', '환급', '징수', '조사',
     '신고서', '세무조정', '세금계산서', '추징', '불복', '경정',
 )
+# Always exclude stand-alone tax consultation services and their operating notices.
+# They are not tax-law amendments, authoritative interpretations or precedents.
+CONSULTATION_NOTICE_TERMS = (
+    '무료세무상담', '무료 세무상담', '세무 무료상담', '무료 세금상담',
+    '무료 세금 상담', '무료납세상담', '무료 납세상담',
+    '세무상담창구', '세무 상담창구', '무료상담창구', '무료 상담창구',
+    '무료상담실', '무료 상담실', '무료세무상담실',
+    '세무상담소', '세무 상담소', '무료세무상담소',
+    '세무상담 일정', '세무 상담 일정', '무료상담 운영',
+    '무료 상담 운영', '납세상담창구', '납세 상담창구',
+)
+
 PROMOTIONAL_OR_ADMIN = (
     '페스티벌', '축제', '이벤트', '캠페인', '경품', '기념식',
     '채용', '서포터즈', '체험행사', '장관 방문', '소비촉진',
@@ -72,6 +84,12 @@ def preliminary_candidate(record):
     """
     title = clean(record.get('title', '')).lower()
     if not title:
+        return False
+    # A consultation-service notice is excluded even when its title contains
+    # tax keywords such as '세무'. Do not let the substantive-title exception
+    # override this explicit rule.
+    normalized_title = ''.join(title.split())
+    if any(''.join(term.lower().split()) in normalized_title for term in CONSULTATION_NOTICE_TERMS):
         return False
     # Promotions and unrelated institutional news are clear non-tax items.
     # If a title also identifies concrete business tax changes, retain it for
@@ -368,6 +386,8 @@ def analyze(records):
 공식 예규·해석·판례·조세심판례로서 실무 참고 가치가 있으면 include=true로 판단하십시오.
 제도 개정이 없더라도 실무 참고가치가 있는 공식 안내는 포함할 수 있습니다.
 단, 할인행사·축제·쿠폰·소비촉진·기관 홍보·단순 방문·해외직구 민원은 제외하십시오.
+무료 세무상담/상담창구/상담실/상담소의 운영 일정, 장소, 신청 안내는 세무 관련 단어가 있어도 반드시 include=false로 제외하십시오.
+단, 법령·과세 기준이 변경되는 실제 공식 발표는 상담 행사와 별개의 실무 자료로 판단하십시오.
 자료 제목과 본문/요약을 함께 판단하십시오. 제목에 세무 용어가 없다는 이유만으로 제외하지 마십시오.
 원문이 확인되지 않은 금액·세율·시행일·법적 효과를 만들지 마십시오.
 선정 건에만 summary(공식 사실 3~5문장)와 implication(기업 실무 점검사항 3~5문장)을
