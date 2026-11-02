@@ -223,29 +223,71 @@ def verify_official_link(url):
     except (urllib.error.URLError, TimeoutError, ValueError):
         return False
 
-def search_nts(start,end):
-    prompt=f'''한국시간 {start}~{end} 기간에 **공식 홈페이지에 게시된** 법인세·부가가치세·세법개정·국세청 예규·조세심판례의 신규 자료를 웹 검색하시오.
-검색 대상은 nts.go.kr 및 taxlaw.nts.go.kr 두 공식 도메인만 사용하시오.
-반드시 공식 페이지의 게시일이 대상 기간에 속하는 자료만 포함. 게시일이 불명확하면 제외. 다른 사이트의 재인용은 제외.
-최대 8건. 검색결과에 없는 문서나 링크를 생성하지 마십시오.
-제목·게시일·원문 URL·원문으로 확인한 짧은 내용만 JSON으로 제출:
-{{"items":[{{"title":"...","date":"YYYY-MM-DD","url":"https://...","excerpt":"..."}}]}}'''
-    result=ask_ai(prompt,search=True)
+# Official agency subdomains. Do not widen to news portals or unverified sites.
+SEARCH_PROFILES = (
+    ('국세청 보도·신고안내', ('nts.go.kr',),
+     '국세청 보도자료·공지사항·법인세/부가가치세/원천세 신고·납부 안내·전자세금계산서·세무조사'),
+    ('국세청 예규·해석', ('taxlaw.nts.go.kr', 'nts.go.kr'),
+     '국세법령정보시스템 예규·질의회신·사전답변·법령해석·법인세·부가가치세·세무조정'),
+    ('조세심판·판례', ('taxlaw.nts.go.kr', 'nts.go.kr'),
+     '국세법령정보시스템 조세심판례·판례·결정례·법인세·부가가치세·국제조세'),
+)
+
+def official_host(url, allowed):
+    host = (urllib.parse.urlsplit(url).hostname or '').lower()
+    return any(host == name or host.endswith('.' + name) for name in allowed)
+
+def search_nts_profile(label, domains, topics, start, end):
+    domain_queries = ' '.join('site:' + d for d in domains)
+    prompt = f'''한국시간 {start}부터 {end}까지 새로 게시된 공식 세무 자료를 찾으십시오.
+수집 분야: {label}. 조사 주제: {topics}.
+공식 검색 대상: {', '.join(domains)}. 검색어에 {domain_queries}를 활용하여
+기관의 게시판 및 개별 원문을 직접 확인하십시오. 동일한 검색어만 반복하지 말고
+주제별로 검색하십시오. 기사 작성일이나 검색 인덱스 시각이 아닌 기관 원문의
+등록일·게시일이 {start}~{end} 범위에 들어오는 항목만 채택하십시오.
+발표일을 알 수 없으면 제외하십시오. 과거 문서를 오늘 게시물로 추정하지 마십시오.
+최대 12건을 제시하되 없으면 빈 배열로 응답하십시오. 제목·게시일·공식 원문 URL,
+확인 가능한 짧은 내용만 작성하십시오. 제삼자 사이트의 재인용 및 추정 URL 금지.
+JSON만 출력: {{"items":[{{"title":"...","date":"YYYY-MM-DD","url":"https://...","excerpt":"..."}}]}}'''
+    result = ask_ai(prompt, search=True)
+    candidates = result.get('items', [])
+    if not isinstance(candidates,list):
+        raise RuntimeError('Web search output items is not an array')
     rows=[]
-    for x in result.get('items',[]):
+    stat={'raw':len(candidates),'invalid_date':0,'invalid_domain':0,
+          'unreachable':0,'invalid_content':0,'accepted':0}
+    for x in candidates:
         if not isinstance(x,dict):continue
         url=safe_url(x.get('url',''))
+        if not url or not official_host(url,domains):
+            stat['invalid_domain']+=1;continue
         date=parse_date(x.get('date',''))
+        if not date or not start<=date<=end:
+            stat['invalid_date']+=1;continue
         title=clean(x.get('title',''))
-        if not url or not date or not start<=date<=end or not title:continue
-        host=urllib.parse.urlsplit(url).hostname or ''
-        if not (host=='nts.go.kr' or host.endswith('.nts.go.kr')): continue
-        if not verify_official_link(url):continue
+        excerpt=clean(x.get('excerpt',''))
+        if not title or not excerpt:
+            stat['invalid_content']+=1;continue
+        if not verify_official_link(url):
+            stat['unreachable']+=1;continue
         rows.append(dict(id=hashlib.sha256(canonical(url).encode()).hexdigest(),
-                         title=title,date=date,url=url,source='국세청·국세법령정보시스템',
-                         excerpt=clean(x.get('excerpt',''))[:1000]))
-    print(f'NTS official web-search verified candidates: {len(rows)}',flush=True)
+                         title=title,date=date,url=url,source=label,
+                         excerpt=excerpt[:1200]))
+    stat['accepted']=len(rows)
+    print(f'TAX_WEB {label}: ' + ', '.join(f'{k}={v}' for k,v in stat.items()),flush=True)
     return rows
+
+def search_nts(start,end):
+    collected=[];success=0
+    for label,domains,topics in SEARCH_PROFILES:
+        try:
+            collected.extend(search_nts_profile(label,domains,topics,start,end))
+            success+=1
+        except Exception as exc:
+            print(f'TAX_WEB_WARNING {label}: {type(exc).__name__}: {str(exc)[:160]}',flush=True)
+    print(f'TAX_WEB_SUMMARY: search_profiles={success}/{len(SEARCH_PROFILES)}, '
+          f'verified_rows={len(collected)}, unique_urls={len({r["id"] for r in collected})}',flush=True)
+    return collected
 
 def analyze(records):
     prompt='''당신은 한국 제조업 법인의 회계·세무 실무 브리핑 편집자입니다. 아래 공식자료를 기업 세무 실무 관점에서 판단하십시오.
@@ -339,17 +381,21 @@ def main():
         print('NO_NEW_WINDOW: nothing due to collect',flush=True);return
     if (ROOT/f'briefings/tax-{today.isoformat()}.html').exists():
         print('ALREADY_PUBLISHED: a tax briefing exists for today',flush=True);return
-    collected=[];successful=0
+    collected=[];successful=0;rss_total=0;rss_dated=0;rss_in_window=0;rss_filtered=0
     for label,url in FEEDS.items():
         try:
             n,rows=rss_rows(label,url)
             successful+=1
-            selected=[x for x in rows if start.isoformat()<=x['date']<=end.isoformat()
-                      and relevant_title(x)]
+            dated=[x for x in rows if start.isoformat()<=x['date']<=end.isoformat()]
+            selected=[x for x in dated if relevant_title(x)]
+            rss_total+=n;rss_dated+=len(rows);rss_in_window+=len(dated);rss_filtered+=len(selected)
             collected+=selected
-            print(f'RSS {label}: {n} entries, {len(selected)} tax-related in date window',flush=True)
+            print(f'RSS {label}: entries={n}, valid_dated_links={len(rows)}, '
+                  f'in_window={len(dated)}, title_relevant={len(selected)}',flush=True)
         except Exception as exc:
             print(f'RSS_WARNING {label}: {type(exc).__name__}: {str(exc)[:110]}',flush=True)
+    print(f'TAX_RSS_SUMMARY: sources_ok={successful}/{len(FEEDS)}, entries={rss_total}, '
+          f'dated_links={rss_dated}, in_window={rss_in_window}, title_relevant={rss_filtered}',flush=True)
     if successful==0:raise RuntimeError('No official RSS feed was available; no report created')
     # Web-search is a complement, not an exhaustive substitute for official structured sources.
     try:
@@ -363,7 +409,14 @@ def main():
     new=[r for r in new if relevant_title(r)]
     print(f'TAX_COLLECT: {len(unique)} distinct candidates, {before} new, {len(new)} relevant titles',flush=True)
     if not new:
-        print('NO_NEW_ITEMS: no verified new tax source; no new report',flush=True);return
+        if not unique:
+            reason='SOURCE_EMPTY: no dated official tax candidates were confirmed by RSS or web search'
+        elif not before:
+            reason='ALREADY_SEEN: candidate official URLs were already published or tracked'
+        else:
+            reason='TITLE_FILTERED: candidates found, but none qualified for business-tax review'
+        print(f'NO_NEW_ITEMS: {reason}; no new report',flush=True)
+        return
     if len(new)>MAX_NEW:
         raise RuntimeError(f'{len(new)} new materials exceed limit {MAX_NEW}; review before publishing')
     summary,items=analyze(new)
