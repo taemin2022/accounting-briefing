@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 # Serializes writes with other briefing workflows, without coupling their results.
 concurrency:
@@ -38,9 +39,12 @@ jobs:
             git commit -m "Publish security market weekly briefing"
             git push
             echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "No new briefing to commit"
+          fi
       - name: Trigger website deployment
         if: steps.save.outputs.changed == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh workflow run deploy-site.yml --ref main
-          fi
