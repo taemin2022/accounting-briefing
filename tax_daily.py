@@ -67,6 +67,16 @@ CONSULTATION_NOTICE_TERMS = (
     '무료 상담 운영', '납세상담창구', '납세 상담창구',
 )
 
+# The same year-end tax settlement simplified-data notices are often posted
+# separately by many local tax offices. Exclude them before AI/web review.
+# Do not exclude substantive withholding-tax law amendments or interpretations.
+def excluded_yearend_simplification(record):
+    title = clean(record.get('title', ''))
+    compact = re.sub(r'\s+', '', title).lower()
+    simplified = ('연말정산' in compact and ('간소화' in compact or '일괄제공' in compact))
+    return simplified or '간소화자료일괄제공' in compact
+
+
 PROMOTIONAL_OR_ADMIN = (
     '페스티벌', '축제', '이벤트', '캠페인', '경품', '기념식',
     '채용', '서포터즈', '체험행사', '장관 방문', '소비촉진',
@@ -83,7 +93,7 @@ def preliminary_candidate(record):
     candidate that survives this minimal filter reaches the AI reviewer.
     """
     title = clean(record.get('title', '')).lower()
-    if not title:
+    if not title or excluded_yearend_simplification(record):
         return False
     # A consultation-service notice is excluded even when its title contains
     # tax keywords such as '세무'. Do not let the substantive-title exception
@@ -303,6 +313,7 @@ def search_nts_profile(label, domains, topics, start, end):
 주제별로 검색하십시오. 기사 작성일이나 검색 인덱스 시각이 아닌 기관 원문의
 등록일·게시일이 {start}~{end} 범위에 들어오는 항목만 채택하십시오.
 발표일을 알 수 없으면 제외하십시오. 과거 문서를 오늘 게시물로 추정하지 마십시오.
+연말정산 간소화자료, 간소화자료 일괄제공 서비스 및 세무서별 신청·운영 안내는 수집 대상에서 제외하십시오.
 최대 12건을 제시하되 없으면 빈 배열로 응답하십시오. 제목·게시일·공식 원문 URL,
 확인 가능한 짧은 내용만 작성하십시오. 제삼자 사이트의 재인용 및 추정 URL 금지.
 JSON만 출력: {{"items":[{{"title":"...","date":"YYYY-MM-DD","url":"https://...","excerpt":"..."}}]}}'''
@@ -387,6 +398,8 @@ def analyze(records):
 제도 개정이 없더라도 실무 참고가치가 있는 공식 안내는 포함할 수 있습니다.
 단, 할인행사·축제·쿠폰·소비촉진·기관 홍보·단순 방문·해외직구 민원은 제외하십시오.
 무료 세무상담/상담창구/상담실/상담소의 운영 일정, 장소, 신청 안내는 세무 관련 단어가 있어도 반드시 include=false로 제외하십시오.
+연말정산 간소화자료 일괄제공 서비스, 국세청·세무서별 연말정산 간소화 신청·운영·자료 제공 안내도 반드시 include=false로 제외하십시오.
+단, 간소화 안내와 별개인 원천징수·소득세 법령 개정과 공식 해석례는 기존 실무 관련성 기준으로 판단하십시오.
 단, 법령·과세 기준이 변경되는 실제 공식 발표는 상담 행사와 별개의 실무 자료로 판단하십시오.
 자료 제목과 본문/요약을 함께 판단하십시오. 제목에 세무 용어가 없다는 이유만으로 제외하지 마십시오.
 원문이 확인되지 않은 금액·세율·시행일·법적 효과를 만들지 마십시오.
@@ -511,6 +524,9 @@ def main():
     seen=get_existing()
     new=[x for k,x in unique.items() if k not in seen]
     before=len(new)
+    excluded_yearend=sum(excluded_yearend_simplification(r) for r in new)
+    if excluded_yearend:
+        print(f'TAX_EXCLUDED_YEAREND_SIMPLIFIED: {excluded_yearend} duplicate-style year-end simplification notices', flush=True)
     new=[r for r in new if preliminary_candidate(r)]
     print(f'TAX_COLLECT: {len(unique)} distinct candidates, {before} new, {len(new)} sent to content review',flush=True)
     if not new:
