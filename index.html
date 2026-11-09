@@ -111,15 +111,19 @@
         overflow:hidden;
       }
       .archive .items {
-        flex:1 1 auto;
+        /* Do not use a constrained CSS grid here: it compresses every card
+           into a thin track when the archive contains many posts. */
+        display:block;
+        flex:1 1 0;
         min-height:0;
         overflow-y:auto;
         overflow-x:hidden;
-        align-content:start;
         overscroll-behavior:contain;
         scrollbar-gutter:stable;
         padding-right:8px;
       }
+      .archive .items .post {margin-bottom:11px}
+      .archive .items .post:last-child {margin-bottom:0}
       .archive .items::-webkit-scrollbar {width:9px}
       .archive .items::-webkit-scrollbar-track {background:#F2F6F6;border-radius:9px}
       .archive .items::-webkit-scrollbar-thumb {background:#C2D5D7;border-radius:9px;border:2px solid #F2F6F6}
@@ -143,7 +147,8 @@
       .service h2 {font-size:12px;margin:8px 0 0;line-height:1.34;letter-spacing:-.035em}
       .service p, .service-rule {display:none}
       .archive {order:3;min-height:0;padding:16px 13px;border-radius:13px;box-shadow:none}
-      .archive .items {overflow:visible;height:auto;max-height:none;min-height:0;scrollbar-gutter:auto;padding-right:0}
+      .archive .items {display:grid;overflow:visible;height:auto;max-height:none;min-height:0;scrollbar-gutter:auto;padding-right:0}
+      .archive .items .post {margin-bottom:0}
       .archive-heading {padding-bottom:11px}
       .archive h2 {font-size:22px;margin-top:3px}
       .section-eyebrow {font-size:9px}
