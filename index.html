@@ -100,6 +100,32 @@
     @media(max-width:650px){.post-title-row{flex-direction:column;align-items:flex-start;gap:4px}.post-headline{width:100%;text-align:left;flex:auto;max-width:100%}.services{grid-template-columns:1fr}.archive{padding:18px}.toolbar{flex-direction:column;align-items:stretch}.today-only{align-self:flex-start}.search{margin-left:0;width:100%}.post-link{flex-direction:column;align-items:flex-start;gap:10px}.filters{justify-content:center}.filters button{flex:1}.hero-description{margin-bottom:16px}.archive-heading{align-items:flex-start}}
     @media(max-width:390px){.container{width:calc(100% - 24px)}.filters{display:grid;grid-template-columns:1fr 1fr}.archive h2{font-size:21px}}
 
+    /* Desktop: the library occupies a viewport-height panel. Only reports scroll;
+       the sidebar, library title, category filters and search remain visible. */
+    @media (min-width:851px) {
+      .archive {
+        height:calc(100vh - 100px);
+        height:calc(100dvh - 100px);
+        min-height:560px;
+        align-self:start;
+        overflow:hidden;
+      }
+      .archive .items {
+        flex:1 1 auto;
+        min-height:0;
+        overflow-y:auto;
+        overflow-x:hidden;
+        align-content:start;
+        overscroll-behavior:contain;
+        scrollbar-gutter:stable;
+        padding-right:8px;
+      }
+      .archive .items::-webkit-scrollbar {width:9px}
+      .archive .items::-webkit-scrollbar-track {background:#F2F6F6;border-radius:9px}
+      .archive .items::-webkit-scrollbar-thumb {background:#C2D5D7;border-radius:9px;border:2px solid #F2F6F6}
+      .archive .items::-webkit-scrollbar-thumb:hover {background:#8BAFB3}
+      .archive .notice {margin-top:12px;flex-shrink:0}
+    }
     /* Mobile-only layout: compact 2x2 briefing tiles -> library -> quick links. */
     @media (max-width:850px) {
       .dashboard {display:flex;flex-direction:column;align-items:stretch;gap:0;padding-top:12px}
@@ -117,6 +143,7 @@
       .service h2 {font-size:12px;margin:8px 0 0;line-height:1.34;letter-spacing:-.035em}
       .service p, .service-rule {display:none}
       .archive {order:3;min-height:0;padding:16px 13px;border-radius:13px;box-shadow:none}
+      .archive .items {overflow:visible;height:auto;max-height:none;min-height:0;scrollbar-gutter:auto;padding-right:0}
       .archive-heading {padding-bottom:11px}
       .archive h2 {font-size:22px;margin-top:3px}
       .section-eyebrow {font-size:9px}
@@ -211,7 +238,7 @@
         <label class="today-only" id="today-filter" title="한국시간 기준 오늘 게시된 브리핑만 보기"><input type="checkbox" id="today-only" aria-label="오늘 자료만 보기">오늘 자료만 보기</label>
         <input id="search" class="search" type="search" aria-label="브리핑 검색" placeholder="제목 · 내용 검색">
       </div>
-      <div id="list" class="items"></div>
+      <div id="list" class="items" tabindex="0" role="region" aria-label="브리핑 목록, 내부 스크롤 가능"></div>
       <div class="notice">본 사이트는 공개자료를 바탕으로 AI가 정리한 브리핑을 제공합니다. 중요한 회계·법률 판단은 공식 발표자료와 기준서 원문을 확인하시기 바랍니다.</div>
     </section>
   </main>
