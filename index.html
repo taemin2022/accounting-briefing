@@ -222,6 +222,32 @@
     @media (max-width:850px) {
       .quicklinks {order:4;margin:13px 0 4px}
     }
+  /* THREE_COLUMN_LAYOUT_V3_BEGIN: stable desktop-only CSS grid placement */
+@media (min-width: 1101px) {
+  .container.dashboard {
+    width: min(1660px, calc(100% - 44px));
+    margin-inline: auto;
+    display: grid;
+    grid-template-columns: minmax(260px, 305px) minmax(0, 1fr) minmax(225px, 265px);
+    grid-template-rows: auto auto minmax(0, 1fr);
+    column-gap: 18px;
+    row-gap: 0;
+    align-items: start;
+  }
+  .dashboard > .sidebar { display: contents; }
+  .dashboard > .sidebar > .nav { grid-column: 1; grid-row: 1; }
+  .dashboard > .sidebar > .hero { grid-column: 1; grid-row: 2; }
+  .dashboard > .sidebar > .services { grid-column: 1; grid-row: 3; }
+  .dashboard > .archive { grid-column: 2; grid-row: 1 / 4; width: 100%; }
+  .dashboard > .sidebar > .quicklinks {
+    grid-column: 3;
+    grid-row: 1 / 4;
+    margin-top: 0;
+    align-self: start;
+    min-width: 0;
+  }
+}
+/* THREE_COLUMN_LAYOUT_V3_END */
   </style>
 </head>
 <body>
