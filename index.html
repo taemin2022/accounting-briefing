@@ -180,116 +180,35 @@
       .service h2 {font-size:11.5px}
     }
 
-    /* BRIEFING_THREE_COLUMN_V1: PC - services | library | quick links */
+    
+    /* FINAL_LAYOUT_CLEAN_BEGIN */
+    /* Keep actual DOM siblings: sidebar | archive | quicklinks */
     @media (min-width:851px) {
-      .container {width:min(1600px,calc(100% - 36px))}
-      .dashboard {grid-template-columns:minmax(225px,280px) minmax(0,1fr) minmax(185px,225px);gap:18px;align-items:start}
-      .sidebar {grid-column:1;grid-row:1}
-      .archive {grid-column:2;grid-row:1}
-      .quicklinks {grid-column:3;grid-row:1;margin-top:0;align-self:start;padding:16px 14px}
-      .quicklinks-list {grid-template-columns:1fr}
-      .hero h1 {font-size:clamp(21px,2vw,26px);white-space:normal;overflow-wrap:keep-all}
-      .service {padding:13px 13px}
-      .service h2 {font-size:15px}
-      .quicklink {padding:9px;min-height:52px}
-      .quicklink b {font-size:11px}
-      .quicklink small {font-size:9px}
+      main.container.dashboard {
+        width:min(1680px,calc(100% - 40px));
+        display:grid;
+        grid-template-columns:minmax(220px,280px) minmax(0,1fr) minmax(190px,245px);
+        gap:18px;
+        align-items:start;
+      }
+      main.dashboard > .sidebar {display:block;grid-column:1;grid-row:1;min-width:0}
+      main.dashboard > .archive {grid-column:2;grid-row:1;min-width:0;width:100%}
+      main.dashboard > .quicklinks {grid-column:3;grid-row:1;margin-top:0;align-self:start;min-width:0}
+      main.dashboard > .quicklinks .quicklinks-list {grid-template-columns:1fr}
+      main.dashboard .hero h1 {white-space:normal;overflow-wrap:keep-all;font-size:clamp(20px,2vw,27px)}
+      main.dashboard .service {padding:13px}
+      main.dashboard .service h2 {font-size:15px}
+      main.dashboard .quicklink {padding:9px;min-height:52px}
+      main.dashboard .quicklink b {font-size:11px}
+      main.dashboard .quicklink small {font-size:9px}
     }
     @media (min-width:851px) and (max-width:1150px) {
-      .dashboard {grid-template-columns:minmax(210px,240px) minmax(0,1fr) minmax(170px,195px);gap:12px}
-      .archive {padding:19px 16px}
-      .quicklinks {padding:12px 10px}
+      main.container.dashboard {grid-template-columns:minmax(185px,230px) minmax(0,1fr) minmax(160px,190px);gap:12px}
+      main.dashboard > .archive {padding:19px 16px}
+      main.dashboard > .quicklinks {padding:12px 10px}
     }
-
-    /* BRIEFING_THREE_COLUMN_V2 - desktop: categories | archive | reference links */
-    @media (min-width:1151px) {
-      .container {width:min(1680px,calc(100% - 40px))}
-      .dashboard {grid-template-columns:minmax(245px,280px) minmax(0,1fr) minmax(210px,250px);gap:18px;align-items:start}
-      .sidebar {grid-column:1;grid-row:1}
-      .archive {grid-column:2;grid-row:1}
-      .quicklinks {grid-column:3;grid-row:1;margin-top:0;align-self:start;padding:17px 14px}
-      .quicklinks-list {grid-template-columns:1fr}
-      .hero h1 {white-space:normal;font-size:clamp(22px,2vw,27px)}
-      .service {padding:13px}
-      .service h2 {font-size:15px}
-      .quicklink {padding:10px;min-height:52px}
-    }
-    @media (min-width:851px) and (max-width:1150px) {
-      .dashboard {grid-template-columns:minmax(230px,260px) minmax(0,1fr)}
-      .quicklinks {grid-column:1/-1;grid-row:2;margin-top:0}
-      .quicklinks-list {grid-template-columns:repeat(4,minmax(0,1fr))}
-    }
-    @media (max-width:850px) {
-      .quicklinks {order:4;margin:13px 0 4px}
-    }
-  /* THREE_COLUMN_LAYOUT_V3_BEGIN: stable desktop-only CSS grid placement */
-@media (min-width: 1101px) {
-  .container.dashboard {
-    width: min(1660px, calc(100% - 44px));
-    margin-inline: auto;
-    display: grid;
-    grid-template-columns: minmax(260px, 305px) minmax(0, 1fr) minmax(225px, 265px);
-    grid-template-rows: auto auto minmax(0, 1fr);
-    column-gap: 18px;
-    row-gap: 0;
-    align-items: start;
-  }
-  .dashboard > .sidebar { display: contents; }
-  .dashboard > .sidebar > .nav { grid-column: 1; grid-row: 1; }
-  .dashboard > .sidebar > .hero { grid-column: 1; grid-row: 2; }
-  .dashboard > .sidebar > .services { grid-column: 1; grid-row: 3; }
-  .dashboard > .archive { grid-column: 2; grid-row: 1 / 4; width: 100%; }
-  .dashboard > .sidebar > .quicklinks {
-    grid-column: 3;
-    grid-row: 1 / 4;
-    margin-top: 0;
-    align-self: start;
-    min-width: 0;
-  }
-}
-/* THREE_COLUMN_LAYOUT_V3_END */
-  /* THREE_COLUMN_LAYOUT_V4_BEGIN */
-/* Use actual direct children of dashboard. Do not move HTML elements. */
-@media (min-width: 851px) {
-  .container.dashboard {
-    width: min(1660px, calc(100% - 36px));
-    display: grid;
-    grid-template-columns: minmax(235px, 285px) minmax(0, 1fr) minmax(195px, 240px);
-    grid-template-rows: auto;
-    gap: 18px;
-    align-items: start;
-    margin-inline: auto;
-  }
-  .dashboard > .sidebar {
-    display: block;
-    grid-column: 1;
-    grid-row: 1;
-    min-width: 0;
-  }
-  .dashboard > .archive {
-    grid-column: 2;
-    grid-row: 1;
-    min-width: 0;
-    width: 100%;
-  }
-  .dashboard > .quicklinks {
-    display: block;
-    grid-column: 3;
-    grid-row: 1;
-    min-width: 0;
-    margin-top: 0;
-    align-self: start;
-  }
-  .dashboard > .quicklinks .quicklinks-list {grid-template-columns: 1fr;}
-}
-@media (min-width: 851px) and (max-width: 1100px) {
-  .container.dashboard {
-    grid-template-columns: minmax(205px, 235px) minmax(0, 1fr) minmax(170px, 195px);
-    gap: 12px;
-  }
-}
-/* THREE_COLUMN_LAYOUT_V4_END */
-</style>
+    /* FINAL_LAYOUT_CLEAN_END */
+  </style>
 </head>
 <body>
   <div class="topline"></div>
