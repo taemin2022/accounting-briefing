@@ -11,16 +11,25 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Apply layout
+      - name: Apply verified desktop layout
         run: python apply_layout.py
-      - name: Commit layout
+      - name: Validate HTML
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          s=Path('index.html').read_text(encoding='utf-8')
+          assert 'BRIEFING_THREE_COLUMN_V2' in s
+          assert s.index('class="archive"') < s.index('class="quicklinks"') < s.index('</main>')
+          print('PASS: archive and quicklinks arranged correctly')
+          PY
+      - name: Commit and push
         run: |
           if git diff --quiet -- index.html; then
-            echo 'No changes'
+            echo 'No changes: layout already applied'
             exit 0
           fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add index.html
-          git commit -m 'Move quick links to right column on desktop'
+          git commit -m 'Fix desktop 3-column briefing layout'
           git push
