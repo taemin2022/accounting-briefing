@@ -1,0 +1,30 @@
+name: Fix desktop three-column layout (clean)
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Apply layout and validate
+        run: |
+          python fix_layout.py
+          python - <<'PY'
+          from pathlib import Path
+          s=Path('index.html').read_text(encoding='utf-8')
+          assert 'FINAL_LAYOUT_CLEAN_BEGIN' in s
+          assert 'BRIEFING_THREE_COLUMN_V1' not in s
+          assert 'main.dashboard > .quicklinks {grid-column:3' in s
+          print('CSS structure verified')
+          PY
+      - name: Commit and push
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add index.html
+          if git diff --cached --quiet; then echo 'No changes'; else git commit -m 'Fix desktop 3-column layout and remove conflicting CSS'; git push; fi
