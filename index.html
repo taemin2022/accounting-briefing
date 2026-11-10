@@ -200,6 +200,28 @@
       .archive {padding:19px 16px}
       .quicklinks {padding:12px 10px}
     }
+
+    /* BRIEFING_THREE_COLUMN_V2 - desktop: categories | archive | reference links */
+    @media (min-width:1151px) {
+      .container {width:min(1680px,calc(100% - 40px))}
+      .dashboard {grid-template-columns:minmax(245px,280px) minmax(0,1fr) minmax(210px,250px);gap:18px;align-items:start}
+      .sidebar {grid-column:1;grid-row:1}
+      .archive {grid-column:2;grid-row:1}
+      .quicklinks {grid-column:3;grid-row:1;margin-top:0;align-self:start;padding:17px 14px}
+      .quicklinks-list {grid-template-columns:1fr}
+      .hero h1 {white-space:normal;font-size:clamp(22px,2vw,27px)}
+      .service {padding:13px}
+      .service h2 {font-size:15px}
+      .quicklink {padding:10px;min-height:52px}
+    }
+    @media (min-width:851px) and (max-width:1150px) {
+      .dashboard {grid-template-columns:minmax(230px,260px) minmax(0,1fr)}
+      .quicklinks {grid-column:1/-1;grid-row:2;margin-top:0}
+      .quicklinks-list {grid-template-columns:repeat(4,minmax(0,1fr))}
+    }
+    @media (max-width:850px) {
+      .quicklinks {order:4;margin:13px 0 4px}
+    }
   </style>
 </head>
 <body>
@@ -258,6 +280,7 @@
       <div id="list" class="items" tabindex="0" role="region" aria-label="브리핑 목록, 내부 스크롤 가능"></div>
       <div class="notice">본 사이트는 공개자료를 바탕으로 AI가 정리한 브리핑을 제공합니다. 중요한 회계·법률 판단은 공식 발표자료와 기준서 원문을 확인하시기 바랍니다.</div>
     </section>
+
     <section class="quicklinks" aria-label="업무 사이트 바로가기">
         <h2 class="quicklinks-title">업무 바로가기</h2>
         <div class="quicklinks-list">
