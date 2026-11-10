@@ -1,0 +1,26 @@
+name: Apply tax office exclusion
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Patch tax collection and remove local-office-only report
+        run: python apply_tax_office_filter.py
+      - name: Commit updated site and collector
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A tax_daily.py posts.json tax_excluded_reports.json briefings/tax-2026-11-10.html
+          if ! git diff --cached --quiet; then
+            git commit -m "Exclude local tax offices from daily tax briefing"
+            git push
+          fi
