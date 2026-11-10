@@ -248,7 +248,48 @@
   }
 }
 /* THREE_COLUMN_LAYOUT_V3_END */
-  </style>
+  /* THREE_COLUMN_LAYOUT_V4_BEGIN */
+/* Use actual direct children of dashboard. Do not move HTML elements. */
+@media (min-width: 851px) {
+  .container.dashboard {
+    width: min(1660px, calc(100% - 36px));
+    display: grid;
+    grid-template-columns: minmax(235px, 285px) minmax(0, 1fr) minmax(195px, 240px);
+    grid-template-rows: auto;
+    gap: 18px;
+    align-items: start;
+    margin-inline: auto;
+  }
+  .dashboard > .sidebar {
+    display: block;
+    grid-column: 1;
+    grid-row: 1;
+    min-width: 0;
+  }
+  .dashboard > .archive {
+    grid-column: 2;
+    grid-row: 1;
+    min-width: 0;
+    width: 100%;
+  }
+  .dashboard > .quicklinks {
+    display: block;
+    grid-column: 3;
+    grid-row: 1;
+    min-width: 0;
+    margin-top: 0;
+    align-self: start;
+  }
+  .dashboard > .quicklinks .quicklinks-list {grid-template-columns: 1fr;}
+}
+@media (min-width: 851px) and (max-width: 1100px) {
+  .container.dashboard {
+    grid-template-columns: minmax(205px, 235px) minmax(0, 1fr) minmax(170px, 195px);
+    gap: 12px;
+  }
+}
+/* THREE_COLUMN_LAYOUT_V4_END */
+</style>
 </head>
 <body>
   <div class="topline"></div>
