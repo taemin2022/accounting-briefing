@@ -86,6 +86,39 @@ PROMOTIONAL_OR_ADMIN = (
     '수상', '우수기관', '행사 개최', '관광', '특판',
 )
 
+# LOCAL_TAX_OFFICE_EXCLUSION_V1
+# Exclude district tax-office announcements before AI review and publication.
+# The National Tax Service headquarters and taxlaw information remain eligible.
+def excluded_local_tax_office(record):
+    from urllib.parse import urlsplit
+    url = str(record.get('url', '')).strip()
+    try:
+        parsed = urlsplit(url)
+        host = (parsed.hostname or '').lower()
+    except ValueError:
+        return True
+    source = clean(record.get('source', '')).replace(' ', '')
+    title = clean(record.get('title', '')).replace(' ', '')
+    excerpt = clean(record.get('excerpt', ''))[:200].replace(' ', '')
+    # Local NTS office pages are served under t.nts.go.kr/<office>/...
+    if host == 't.nts.go.kr':
+        return True
+    # Other local offices sometimes have office-specific subdomains.
+    if host.endswith('.nts.go.kr') and host not in ('www.nts.go.kr', 'taxlaw.nts.go.kr', 'nts.go.kr'):
+        return True
+    # Explicit source provenance (but don't reject a national law article
+    # merely because its content mentions a local office).
+    if source.endswith('세무서') or source.endswith('지방국세청'):
+        return True
+    if re.search(r'(구미|상주|강남|서초|중부|종로|용산|영등포|동대문|동작|성동|송파|마포|강서|양천|금천|관악|잠실|노원|도봉|강북|성북|은평|서대문|남대문|반포|역삼|삼성|수원|용인|분당|성남|기흥|동수원|안양|안산|부천|인천|대구|동대구|서대구|북대구|남대구|부산|광주|대전|울산|창원|전주|청주|천안|제주)세무서', title + excerpt):
+        # Avoid excluding a headquarters-issued legal update that simply
+        # quotes a tax office; only classify generic administrative notices.
+        administrative = ('공지', '안내', '행사', '환급금', '상담', '교육', '민원', '운영', '신청')
+        substantive = ('개정', '시행령', '예규', '질의회신', '판결', '심판례', '유권해석')
+        if any(x in title for x in administrative) and not any(x in title for x in substantive):
+            return True
+    return False
+
 def preliminary_candidate(record):
     """Only eliminate obviously irrelevant promotions before AI content review.
 
@@ -93,7 +126,7 @@ def preliminary_candidate(record):
     candidate that survives this minimal filter reaches the AI reviewer.
     """
     title = clean(record.get('title', '')).lower()
-    if not title or excluded_yearend_simplification(record):
+    if not title or excluded_yearend_simplification(record) or excluded_local_tax_office(record):
         return False
     # A consultation-service notice is excluded even when its title contains
     # tax keywords such as '세무'. Do not let the substantive-title exception
@@ -313,7 +346,7 @@ def search_nts_profile(label, domains, topics, start, end):
 주제별로 검색하십시오. 기사 작성일이나 검색 인덱스 시각이 아닌 기관 원문의
 등록일·게시일이 {start}~{end} 범위에 들어오는 항목만 채택하십시오.
 발표일을 알 수 없으면 제외하십시오. 과거 문서를 오늘 게시물로 추정하지 마십시오.
-연말정산 간소화자료, 간소화자료 일괄제공 서비스 및 세무서별 신청·운영 안내는 수집 대상에서 제외하십시오.
+연말정산 간소화자료와 개별 세무서(구미·상주세무서 등 전국 세무서) 공지사항 전체는 제외하십시오. 특히 t.nts.go.kr 하위의 세무서별 게시물은 결과에 절대 포함하지 마십시오. 국세청 본청(www.nts.go.kr) 발표와 국세법령정보시스템(taxlaw.nts.go.kr)의 법령·예규·해석례는 유지하십시오.
 최대 12건을 제시하되 없으면 빈 배열로 응답하십시오. 제목·게시일·공식 원문 URL,
 확인 가능한 짧은 내용만 작성하십시오. 제삼자 사이트의 재인용 및 추정 URL 금지.
 JSON만 출력: {{"items":[{{"title":"...","date":"YYYY-MM-DD","url":"https://...","excerpt":"..."}}]}}'''
@@ -327,7 +360,7 @@ JSON만 출력: {{"items":[{{"title":"...","date":"YYYY-MM-DD","url":"https://..
     for x in candidates:
         if not isinstance(x,dict):continue
         url=safe_url(x.get('url',''))
-        if not url or not official_host(url,domains):
+        if not url or not official_host(url,domains) or excluded_local_tax_office(x):
             stat['invalid_domain']+=1;continue
         date=parse_date(x.get('date',''))
         if not date or not start<=date<=end:
@@ -389,6 +422,7 @@ def _review_items(payload, expected_ids):
 
 def analyze(records):
     '''Review all candidates, validating a verdict for each supplied ID.'''
+    records = [r for r in records if not excluded_local_tax_office(r)]
     review_ids = {r['id']: f'T{idx:03d}' for idx, r in enumerate(records, 1)}
     review_records = [dict(r, id=review_ids[r['id']]) for r in records]
     prompt = ('''당신은 한국 제조업 법인의 세무 실무 담당자를 위한 편집자입니다.
@@ -396,7 +430,7 @@ def analyze(records):
 기업의 법인세·부가가치세·원천세·세무조정·국제조세·관세·신고절차 등에 적용되거나
 공식 예규·해석·판례·조세심판례로서 실무 참고 가치가 있으면 include=true로 판단하십시오.
 제도 개정이 없더라도 실무 참고가치가 있는 공식 안내는 포함할 수 있습니다.
-단, 할인행사·축제·쿠폰·소비촉진·기관 홍보·단순 방문·해외직구 민원은 제외하십시오.
+전국 개별 세무서 및 지방국세청의 일반 공지, 환급금 확인·수령 안내는 반드시 제외하십시오. 단, 국세청 본청이 직접 게시한 세법 개정·공식 예규·해석례는 포함 대상입니다. 단, 할인행사·축제·쿠폰·소비촉진·기관 홍보·단순 방문·해외직구 민원은 제외하십시오.
 무료 세무상담/상담창구/상담실/상담소의 운영 일정, 장소, 신청 안내는 세무 관련 단어가 있어도 반드시 include=false로 제외하십시오.
 연말정산 간소화자료 일괄제공 서비스, 국세청·세무서별 연말정산 간소화 신청·운영·자료 제공 안내도 반드시 include=false로 제외하십시오.
 단, 간소화 안내와 별개인 원천징수·소득세 법령 개정과 공식 해석례는 기존 실무 관련성 기준으로 판단하십시오.
@@ -446,6 +480,10 @@ JSON 객체 형식 이외의 텍스트는 출력하지 마십시오.
 
 def publish(today,start,end,summary,items,ids):
     # Existing site-compatible report renderer from briefing.py.
+    items = [r for r in items if not excluded_local_tax_office(r)]
+    if not items:
+        print('LOCAL_OFFICE_ONLY: no eligible report to publish', flush=True)
+        return
     from briefing import page,CATEGORIES
     CATEGORIES['tax']='세무 일일 브리핑'
     relative=f'briefings/tax-{today.isoformat()}.html'
