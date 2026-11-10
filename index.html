@@ -179,6 +179,27 @@
       .service {padding:10px 9px}
       .service h2 {font-size:11.5px}
     }
+
+    /* BRIEFING_THREE_COLUMN_V1: PC - services | library | quick links */
+    @media (min-width:851px) {
+      .container {width:min(1600px,calc(100% - 36px))}
+      .dashboard {grid-template-columns:minmax(225px,280px) minmax(0,1fr) minmax(185px,225px);gap:18px;align-items:start}
+      .sidebar {grid-column:1;grid-row:1}
+      .archive {grid-column:2;grid-row:1}
+      .quicklinks {grid-column:3;grid-row:1;margin-top:0;align-self:start;padding:16px 14px}
+      .quicklinks-list {grid-template-columns:1fr}
+      .hero h1 {font-size:clamp(21px,2vw,26px);white-space:normal;overflow-wrap:keep-all}
+      .service {padding:13px 13px}
+      .service h2 {font-size:15px}
+      .quicklink {padding:9px;min-height:52px}
+      .quicklink b {font-size:11px}
+      .quicklink small {font-size:9px}
+    }
+    @media (min-width:851px) and (max-width:1150px) {
+      .dashboard {grid-template-columns:minmax(210px,240px) minmax(0,1fr) minmax(170px,195px);gap:12px}
+      .archive {padding:19px 16px}
+      .quicklinks {padding:12px 10px}
+    }
   </style>
 </head>
 <body>
@@ -217,15 +238,6 @@
           <div class="service-rule"></div>
         </button>
       </section>
-      <section class="quicklinks" aria-label="업무 사이트 바로가기">
-        <h2 class="quicklinks-title">업무 바로가기</h2>
-        <div class="quicklinks-list">
-          <a class="quicklink" href="https://dart.fss.or.kr/" target="_blank" rel="noopener noreferrer"><span><b>DART 전자공시시스템</b><small>기업공시 · 사업보고서 · 감사보고서</small></span><span class="quicklink-arrow" aria-hidden="true">↗</span></a>
-          <a class="quicklink" href="https://www.kasb.or.kr/" target="_blank" rel="noopener noreferrer"><span><b>한국회계기준원</b><small>K-IFRS 기준서 · 제·개정 정보</small></span><span class="quicklink-arrow" aria-hidden="true">↗</span></a>
-          <a class="quicklink" href="https://www.fss.or.kr/" target="_blank" rel="noopener noreferrer"><span><b>금융감독원</b><small>보도자료 · 감독 정책 · 감리 동향</small></span><span class="quicklink-arrow" aria-hidden="true">↗</span></a>
-          <a class="quicklink" href="https://taxlaw.nts.go.kr/index.do" target="_blank" rel="noopener noreferrer"><span><b>국세법령정보시스템</b><small>세법 · 해석례 · 판례 · 심판례</small></span><span class="quicklink-arrow" aria-hidden="true">↗</span></a>
-        </div>
-      </section>
     </aside>
     <section class="archive" id="archive" aria-label="브리핑 자료실">
       <div class="archive-heading">
@@ -246,6 +258,15 @@
       <div id="list" class="items" tabindex="0" role="region" aria-label="브리핑 목록, 내부 스크롤 가능"></div>
       <div class="notice">본 사이트는 공개자료를 바탕으로 AI가 정리한 브리핑을 제공합니다. 중요한 회계·법률 판단은 공식 발표자료와 기준서 원문을 확인하시기 바랍니다.</div>
     </section>
+    <section class="quicklinks" aria-label="업무 사이트 바로가기">
+        <h2 class="quicklinks-title">업무 바로가기</h2>
+        <div class="quicklinks-list">
+          <a class="quicklink" href="https://dart.fss.or.kr/" target="_blank" rel="noopener noreferrer"><span><b>DART 전자공시시스템</b><small>기업공시 · 사업보고서 · 감사보고서</small></span><span class="quicklink-arrow" aria-hidden="true">↗</span></a>
+          <a class="quicklink" href="https://www.kasb.or.kr/" target="_blank" rel="noopener noreferrer"><span><b>한국회계기준원</b><small>K-IFRS 기준서 · 제·개정 정보</small></span><span class="quicklink-arrow" aria-hidden="true">↗</span></a>
+          <a class="quicklink" href="https://www.fss.or.kr/" target="_blank" rel="noopener noreferrer"><span><b>금융감독원</b><small>보도자료 · 감독 정책 · 감리 동향</small></span><span class="quicklink-arrow" aria-hidden="true">↗</span></a>
+          <a class="quicklink" href="https://taxlaw.nts.go.kr/index.do" target="_blank" rel="noopener noreferrer"><span><b>국세법령정보시스템</b><small>세법 · 해석례 · 판례 · 심판례</small></span><span class="quicklink-arrow" aria-hidden="true">↗</span></a>
+        </div>
+      </section>
   </main>
   <footer class="container"><span>© Accounting &amp; Internal Control AI Briefing</span><span>금융감독원 · K-IFRS · 세무 · 보안시장 동향</span></footer>
 <script>
