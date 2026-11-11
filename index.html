@@ -197,6 +197,8 @@
       }
       .sidebar .nav {flex: 0 0 auto; margin-bottom: 17px}
       .sidebar .hero {flex: 0 0 auto}
+      /* Keep the full brand title visible in the narrower left column. */
+      .sidebar .hero h1 {font-size:20px;letter-spacing:-.075em;white-space:normal;overflow-wrap:break-word;word-break:keep-all;line-height:1.3}
       .sidebar .hero-description {margin-bottom: 13px}
       .sidebar .services {
         flex: 1 1 0;
@@ -235,6 +237,7 @@
     }
     @media (min-width:851px) and (max-width:1100px) {
       .dashboard {grid-template-columns: minmax(205px,230px) minmax(0,1fr) 132px;gap:11px}
+      .sidebar .hero h1 {font-size:17px}
       .sidebar .service {padding:9px 10px}
       .sidebar .service h2 {font-size:12.5px}
       .sidebar .service p {font-size:9.5px}
